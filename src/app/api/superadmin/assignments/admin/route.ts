@@ -49,11 +49,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { adminId, vehicleId } = body;
+    let { adminId, vehicleId, vehicleIds } = body;
 
-    if (!adminId || !vehicleId) {
+    if (!adminId) {
       return NextResponse.json(
-        { error: 'Admin ID and Vehicle ID are required.' },
+        { error: 'Admin ID is required.' },
+        { status: 400 }
+      );
+    }
+
+    if (vehicleId && !vehicleIds) {
+      vehicleIds = [vehicleId];
+    }
+
+    if (!Array.isArray(vehicleIds)) {
+      return NextResponse.json(
+        { error: 'Vehicle ID or vehicleIds array is required.' },
         { status: 400 }
       );
     }
@@ -67,36 +78,66 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User is not an Admin.' }, { status: 400 });
     }
 
-    // Verify vehicle exists
-    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
-    if (!vehicle) {
-      return NextResponse.json({ error: 'Vehicle not found.' }, { status: 404 });
+    // Fetch existing assignments for this admin
+    const currentAssignments = await db
+      .select()
+      .from(adminVehicleAssignments)
+      .where(eq(adminVehicleAssignments.adminId, adminId));
+
+    const currentVehicleIds = currentAssignments.map((a) => a.vehicleId);
+
+    const targetSet = new Set(vehicleIds);
+    const currentSet = new Set(currentVehicleIds);
+
+    const toAdd = vehicleIds.filter((id: string) => !currentSet.has(id));
+    const toRemove = currentVehicleIds.filter((id) => !targetSet.has(id));
+
+    // Remove assignments not in targetSet
+    for (const vid of toRemove) {
+      await db
+        .delete(adminVehicleAssignments)
+        .where(
+          and(
+            eq(adminVehicleAssignments.adminId, adminId),
+            eq(adminVehicleAssignments.vehicleId, vid)
+          )
+        );
+
+      await logAudit({
+        actorUserId: actor!.userId,
+        action: 'ADMIN_VEHICLE_REMOVED',
+        entityType: 'users',
+        entityId: adminId,
+        metadata: { vehicleId: vid },
+      });
     }
 
-    // Insert (with ignore or ON CONFLICT to prevent error if already assigned)
-    const [assignment] = await db
-      .insert(adminVehicleAssignments)
-      .values({ adminId, vehicleId })
-      .onConflictDoNothing()
-      .returning();
+    // Add new assignments
+    for (const vid of toAdd) {
+      const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, vid)).limit(1);
+      if (vehicle) {
+        await db
+          .insert(adminVehicleAssignments)
+          .values({ adminId, vehicleId: vid })
+          .onConflictDoNothing();
 
-    // Log admin vehicle mapping created
-    await logAudit({
-      actorUserId: actor!.userId,
-      action: 'ADMIN_VEHICLE_ASSIGNED',
-      entityType: 'users',
-      entityId: adminId,
-      metadata: { vehicleId, vehicleNumber: vehicle.vehicleNumber },
-    });
+        await logAudit({
+          actorUserId: actor!.userId,
+          action: 'ADMIN_VEHICLE_ASSIGNED',
+          entityType: 'users',
+          entityId: adminId,
+          metadata: { vehicleId: vid, vehicleNumber: vehicle.vehicleNumber },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      assignment: assignment || null,
-      message: 'Vehicle successfully assigned to Admin.',
+      message: 'Admin vehicle assignments updated successfully.',
     });
   } catch (error) {
     console.error('[ADMIN_ASSIGNMENT_POST_ERROR]', error);
-    return NextResponse.json({ error: 'Failed to assign vehicle to Admin.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to assign vehicles to Admin.' }, { status: 500 });
   }
 }
 

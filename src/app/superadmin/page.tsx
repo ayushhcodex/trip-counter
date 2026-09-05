@@ -87,7 +87,19 @@ export default function SuperAdminDashboard() {
 
   // Admin Assignment form
   const [assignAdminId, setAssignAdminId] = useState('');
-  const [assignAdminVehicleId, setAssignAdminVehicleId] = useState('');
+  const [assignAdminVehicleIds, setAssignAdminVehicleIds] = useState<string[]>([]);
+
+  const handleAdminSelect = (adminId: string, currentAdminAssignments = adminAssignments) => {
+    setAssignAdminId(adminId);
+    if (adminId) {
+      const assignedVids = currentAdminAssignments
+        .filter((a) => a.adminId === adminId)
+        .map((a) => a.vehicleId);
+      setAssignAdminVehicleIds(assignedVids);
+    } else {
+      setAssignAdminVehicleIds([]);
+    }
+  };
 
   const loadAllData = async () => {
     setLoading(true);
@@ -278,22 +290,27 @@ export default function SuperAdminDashboard() {
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!assignAdminId) {
+      setErrorMsg('Please select a System Admin.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/superadmin/assignments/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminId: assignAdminId,
-          vehicleId: assignAdminVehicleId,
+          vehicleIds: assignAdminVehicleIds,
         }),
       });
 
       if (res.ok) {
-        setSuccessMsg('Admin vehicle mapping assigned successfully.');
+        setSuccessMsg('Admin vehicle mappings updated successfully.');
         await loadAllData();
       } else {
         const err = await res.json();
-        setErrorMsg(err.error || 'Failed to assign Admin.');
+        setErrorMsg(err.error || 'Failed to update Admin vehicle mappings.');
       }
     } catch (err) {
       setErrorMsg('Network error.');
@@ -794,15 +811,36 @@ export default function SuperAdminDashboard() {
                     </form>
                   </div>
 
-                  {/* Assign Vehicle to Admin */}
+                  {/* Assign Vehicles to Admin */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Map Vehicle to Admin</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Map Vehicles to Admin</h3>
+                      {assignAdminId && (
+                        <div className="flex items-center space-x-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setAssignAdminVehicleIds(vehiclesList.map((v) => v.id))}
+                            className="text-blue-600 hover:text-blue-800 font-bold"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setAssignAdminVehicleIds([])}
+                            className="text-slate-500 hover:text-slate-700 font-bold"
+                          >
+                            Deselect All
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <form onSubmit={handleAdminAssign} className="space-y-3.5 text-xs">
                       <div>
                         <label className="block font-bold uppercase text-slate-400 mb-1">System Admin</label>
                         <select
                           value={assignAdminId}
-                          onChange={(e) => setAssignAdminId(e.target.value)}
+                          onChange={(e) => handleAdminSelect(e.target.value)}
                           required
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
                         >
@@ -814,25 +852,50 @@ export default function SuperAdminDashboard() {
                             ))}
                         </select>
                       </div>
+
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">Target Vehicle</label>
-                        <select
-                          value={assignAdminVehicleId}
-                          onChange={(e) => setAssignAdminVehicleId(e.target.value)}
-                          required
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold uppercase"
-                        >
-                          <option value="">Select Vehicle</option>
-                          {vehiclesList.map((v) => (
-                            <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-                          ))}
-                        </select>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">
+                          Assigned Vehicles ({assignAdminVehicleIds.length} Selected)
+                        </label>
+                        {vehiclesList.length === 0 ? (
+                          <p className="text-slate-400 italic py-2">No vehicles available.</p>
+                        ) : (
+                          <div className="max-h-52 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1.5">
+                            {vehiclesList.map((v) => {
+                              const isChecked = assignAdminVehicleIds.includes(v.id);
+                              return (
+                                <label
+                                  key={v.id}
+                                  className={`flex items-center space-x-2.5 p-2 rounded cursor-pointer transition-colors ${
+                                    isChecked ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-slate-100 text-slate-700 font-medium'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setAssignAdminVehicleIds([...assignAdminVehicleIds, v.id]);
+                                      } else {
+                                        setAssignAdminVehicleIds(assignAdminVehicleIds.filter((id) => id !== v.id));
+                                      }
+                                    }}
+                                    className="rounded border-slate-300 text-blue-900 focus:ring-blue-800 h-4 w-4"
+                                  />
+                                  <span className="uppercase text-xs tracking-wider">{v.vehicleNumber} ({v.status})</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
+
                       <button
                         type="submit"
-                        className="w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2"
+                        disabled={!assignAdminId}
+                        className="w-full bg-blue-900 hover:bg-blue-800 disabled:bg-slate-300 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2 transition-all cursor-pointer"
                       >
-                        Grant Admin Permission
+                        Save Admin Vehicle Mappings
                       </button>
                     </form>
                   </div>
