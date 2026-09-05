@@ -60,9 +60,13 @@ self.addEventListener('fetch', (event) => {
         });
 
         return networkResponse;
-      }).catch(() => {
+      }).catch(async () => {
         // Fallback if network is missing and not cached
-        return caches.match('/login') || new Response('Offline contents not available.');
+        const fallback = await caches.match('/login');
+        return fallback || new Response('Offline contents not available.', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain' },
+        });
       });
     })
   );
