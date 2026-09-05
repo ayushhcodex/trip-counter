@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "TripCounter - Vehicle Trip Verification",
   description: "Mobile-first PWA for vehicle trip counting and verification.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
