@@ -190,6 +190,14 @@ async function setupSupabaseSchema() {
     }
     console.log('✅ 30 Sequential Drivers Seeded: drv0001 - drv0030 / DriverPass123!');
 
+    // Also seed drv001 for convenience
+    await client`
+      INSERT INTO users (username_or_email, name, phone, password_hash, role, status)
+      VALUES ('drv001', 'Driver 001', '+919876540001', ${driverPass}, 'DRIVER', 'ACTIVE')
+      ON CONFLICT (username_or_email) DO NOTHING;
+    `;
+    console.log('✅ Driver drv001 Seeded / DriverPass123!');
+
   } catch (error) {
     console.error('❌ Supabase schema setup error:', error);
   } finally {
