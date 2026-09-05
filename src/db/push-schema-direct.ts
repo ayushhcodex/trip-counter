@@ -176,27 +176,28 @@ async function setupSupabaseSchema() {
     console.log('✅ Super Admin Seeded: superadmin@tripcounter.org / SuperAdminPass123!');
 
     // Seed 30 Drivers
-    const driverPass = await hashPassword('DriverPass123!');
     for (let i = 1; i <= 30; i++) {
       const numStr = String(i).padStart(4, '0');
       const driverId = `drv${numStr}`;
       const name = `Driver ${numStr}`;
       const phone = `+91987654${numStr}`;
+      const pass = await hashPassword(`Trip@${numStr}`);
       await client`
         INSERT INTO users (username_or_email, name, phone, password_hash, role, status)
-        VALUES (${driverId}, ${name}, ${phone}, ${driverPass}, 'DRIVER', 'ACTIVE')
-        ON CONFLICT (username_or_email) DO UPDATE SET name = ${name};
+        VALUES (${driverId}, ${name}, ${phone}, ${pass}, 'DRIVER', 'ACTIVE')
+        ON CONFLICT (username_or_email) DO UPDATE SET password_hash = ${pass}, name = ${name};
       `;
     }
-    console.log('✅ 30 Sequential Drivers Seeded: drv0001 - drv0030 / DriverPass123!');
+    console.log('✅ 30 Sequential Drivers Seeded: drv0001 - drv0030 / Trip@0001 - Trip@0030');
 
     // Also seed drv001 for convenience
+    const pass001 = await hashPassword('Trip@001');
     await client`
       INSERT INTO users (username_or_email, name, phone, password_hash, role, status)
-      VALUES ('drv001', 'Driver 001', '+919876540001', ${driverPass}, 'DRIVER', 'ACTIVE')
-      ON CONFLICT (username_or_email) DO NOTHING;
+      VALUES ('drv001', 'Driver 001', '+919876540001', ${pass001}, 'DRIVER', 'ACTIVE')
+      ON CONFLICT (username_or_email) DO UPDATE SET password_hash = ${pass001};
     `;
-    console.log('✅ Driver drv001 Seeded / DriverPass123!');
+    console.log('✅ Driver drv001 Seeded / Trip@001');
 
   } catch (error) {
     console.error('❌ Supabase schema setup error:', error);

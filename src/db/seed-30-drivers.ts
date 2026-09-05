@@ -6,7 +6,6 @@ import { eq } from 'drizzle-orm';
 async function seed30Drivers4Digits() {
   console.log('--- Seeding 30 Drivers (4-Digit Padded) Started ---');
   try {
-    const passwordHash = await hashPassword('DriverPass123!');
     const driverList = [];
 
     for (let i = 1; i <= 30; i++) {
@@ -14,6 +13,7 @@ async function seed30Drivers4Digits() {
       const driverId = `drv${numStr}`;
       const name = `Driver ${numStr}`;
       const phone = `+91987654${numStr}`;
+      const passwordHash = await hashPassword(`Trip@${numStr}`);
 
       driverList.push({
         usernameOrEmail: driverId,
