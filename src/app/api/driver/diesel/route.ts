@@ -6,7 +6,7 @@ import { checkAuth } from '@/lib/api-middlewares';
 import { getLocalDateString } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['DRIVER', 'ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['DRIVER', 'ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     // Determine target driver ID
     let targetDriverId = actor!.userId;
-    if ((actor!.role === 'ADMIN' || actor!.role === 'SUPER_ADMIN') && filterDriverId) {
+    if ((actor!.role === 'ADMIN' || actor!.role === 'SUPERVISOR' || actor!.role === 'SUPER_ADMIN') && filterDriverId) {
       targetDriverId = filterDriverId;
     }
 

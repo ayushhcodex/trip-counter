@@ -552,14 +552,14 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Admin Assignments */}
+                  {/* Admin & Supervisor Assignments */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Admin Vehicle Mappings</h3>
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Admin & Supervisor Vehicle Mappings</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                            <th className="pb-2">Admin Name</th>
+                            <th className="pb-2">Admin / Supervisor Name</th>
                             <th className="pb-2">Vehicle Number</th>
                             <th className="pb-2 text-right">Actions</th>
                           </tr>
@@ -826,10 +826,10 @@ export default function SuperAdminDashboard() {
                     </form>
                   </div>
 
-                  {/* Assign Vehicles to Admin */}
+                  {/* Assign Vehicles to Admin / Supervisor */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Map Vehicles to Admin</h3>
+                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Map Vehicles to Admin / Supervisor</h3>
                       {assignAdminId && (
                         <div className="flex items-center space-x-2 text-[11px]">
                           <button
@@ -852,18 +852,18 @@ export default function SuperAdminDashboard() {
                     </div>
                     <form onSubmit={handleAdminAssign} className="space-y-3.5 text-xs">
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">System Admin</label>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">System Admin / Supervisor</label>
                         <select
                           value={assignAdminId}
                           onChange={(e) => handleAdminSelect(e.target.value)}
                           required
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
                         >
-                          <option value="">Select Admin</option>
+                          <option value="">Select Admin / Supervisor</option>
                           {usersList
-                            .filter((u) => u.role === 'ADMIN')
+                            .filter((u) => u.role === 'ADMIN' || u.role === 'SUPERVISOR')
                             .map((u) => (
-                              <option key={u.id} value={u.id}>{u.name} ({u.usernameOrEmail})</option>
+                              <option key={u.id} value={u.id}>{u.name} ({u.usernameOrEmail} - {u.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin'})</option>
                             ))}
                         </select>
                       </div>

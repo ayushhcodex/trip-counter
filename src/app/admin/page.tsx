@@ -55,6 +55,15 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
 
+  // Quick Inline Trip Adjustment States
+  const [activeAdjustVehicleId, setActiveAdjustVehicleId] = useState<string | null>(null);
+  const [adjDriverId, setAdjDriverId] = useState<string>('');
+  const [adjType, setAdjType] = useState<'add' | 'remove'>('add');
+  const [adjAmount, setAdjAmount] = useState<string>('1');
+  const [adjReason, setAdjReason] = useState<string>('');
+  const [isSubmittingAdj, setIsSubmittingAdj] = useState<boolean>(false);
+  const [adjStatusMessage, setAdjStatusMessage] = useState<{ type: 'success' | 'error'; text: string; vehicleId: string } | null>(null);
+
   const cacheRef = useRef<Record<string, VehiclesResponse>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -206,6 +215,68 @@ export default function AdminDashboard() {
       console.error('Failed to verify', err);
     }
   }, [dateRangeInfo, activeTab, customStartDate, customEndDate, fetchVehicles]);
+
+  const toggleAdjustForm = useCallback((vehicle: Vehicle) => {
+    setActiveAdjustVehicleId((prev) => {
+      if (prev === vehicle.id) {
+        setAdjStatusMessage(null);
+        return null;
+      }
+      setAdjDriverId(vehicle.driver1?.id || vehicle.driver2?.id || '');
+      setAdjType('add');
+      setAdjAmount('1');
+      setAdjReason('');
+      setAdjStatusMessage(null);
+      return vehicle.id;
+    });
+  }, []);
+
+  const handleApplyAdjustment = useCallback(async (e: React.FormEvent, vehicleId: string) => {
+    e.preventDefault();
+    if (!dateRangeInfo) return;
+    if (!adjDriverId) {
+      setAdjStatusMessage({ type: 'error', text: 'Please select a driver to adjust.', vehicleId });
+      return;
+    }
+    if (!adjReason.trim()) {
+      setAdjStatusMessage({ type: 'error', text: 'Please provide a mandatory reason for adjustment.', vehicleId });
+      return;
+    }
+
+    setIsSubmittingAdj(true);
+    setAdjStatusMessage(null);
+
+    const amountVal = parseInt(adjAmount, 10) || 1;
+    const finalAmount = adjType === 'add' ? amountVal : -amountVal;
+
+    try {
+      const res = await fetch('/api/admin/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId,
+          date: dateRangeInfo.start,
+          driverId: adjDriverId,
+          adjustment: finalAmount,
+          reason: adjReason.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setAdjStatusMessage({ type: 'success', text: `Adjustment of ${finalAmount > 0 ? '+' : ''}${finalAmount} applied! Driver notified.`, vehicleId });
+        setAdjReason('');
+        // Refresh live stats
+        fetchVehicles(activeTab, customStartDate, customEndDate, true);
+      } else {
+        const err = await res.json();
+        setAdjStatusMessage({ type: 'error', text: err.error || 'Failed to apply adjustment.', vehicleId });
+      }
+    } catch {
+      setAdjStatusMessage({ type: 'error', text: 'Network error. Try again.', vehicleId });
+    } finally {
+      setIsSubmittingAdj(false);
+    }
+  }, [dateRangeInfo, adjDriverId, adjReason, adjAmount, adjType, activeTab, customStartDate, customEndDate, fetchVehicles]);
 
   const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -414,28 +485,157 @@ export default function AdminDashboard() {
                         {isSingleDay && vehicle.verificationStatus !== 'VERIFIED' && (
                           <button
                             onClick={() => handleVerify(vehicle.id)}
-                            className="w-full bg-emerald-600 active:bg-emerald-700 text-white py-3 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                            className="w-full bg-emerald-600 active:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                             Verify Today&apos;s Trips
                           </button>
                         )}
 
                         {vehicle.verificationStatus === 'VERIFIED' && isSingleDay && (
-                          <div className="w-full bg-emerald-50 text-emerald-700 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200">
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                          <div className="w-full bg-emerald-50 text-emerald-700 py-2 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200 text-xs">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
                             Verified
                           </div>
                         )}
 
-                        {(userProfile?.role === 'SUPERVISOR' || userProfile?.role === 'SUPER_ADMIN') && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => toggleAdjustForm(vehicle)}
+                            className={`py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs ${
+                              activeAdjustVehicleId === vehicle.id
+                                ? 'bg-blue-900 text-white'
+                                : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200'
+                            }`}
+                          >
+                            <span>⚡</span> {activeAdjustVehicleId === vehicle.id ? 'Close Adjust' : 'Adjust Trips (+/-)'}
+                          </button>
+
                           <button
                             onClick={() => router.push(`/admin/vehicle/${vehicle.id}`)}
-                            className="w-full bg-slate-800 active:bg-slate-900 text-white py-3 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                            className="bg-slate-800 active:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
                           >
-                            <span>⛽</span> Record Diesel
+                            <span>⛽</span> Fuel & Details →
                           </button>
-                        )}
+                        </div>
+                      </div>
+
+                      {/* Inline Quick Adjustment Form */}
+                      {activeAdjustVehicleId === vehicle.id && (
+                        <div className="mb-4 bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-3">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <h4 className="font-extrabold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                              <span>⚡</span> Adjust Trip Count
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-semibold">{dateRangeInfo?.start}</span>
+                          </div>
+
+                          {adjStatusMessage && adjStatusMessage.vehicleId === vehicle.id && (
+                            <div className={`p-2 rounded-lg text-xs font-semibold text-center ${
+                              adjStatusMessage.type === 'success'
+                                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                                : 'bg-red-50 border border-red-200 text-red-700'
+                            }`}>
+                              {adjStatusMessage.text}
+                            </div>
+                          )}
+
+                          <form onSubmit={(e) => handleApplyAdjustment(e, vehicle.id)} className="space-y-2.5 text-xs">
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Target Driver</label>
+                              <select
+                                value={adjDriverId}
+                                onChange={(e) => setAdjDriverId(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700 font-semibold"
+                                required
+                              >
+                                <option value="">Select Driver</option>
+                                {vehicle.driver1 && <option value={vehicle.driver1.id}>Slot 1: {vehicle.driver1.name} ({vehicle.driver1.reportedCount} trips)</option>}
+                                {vehicle.driver2 && <option value={vehicle.driver2.id}>Slot 2: {vehicle.driver2.name} ({vehicle.driver2.reportedCount} trips)</option>}
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Type</label>
+                                <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
+                                  <button
+                                    type="button"
+                                    onClick={() => setAdjType('add')}
+                                    className={`py-1 rounded text-center text-xs font-bold transition-all ${
+                                      adjType === 'add' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500'
+                                    }`}
+                                  >
+                                    + Add
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAdjType('remove')}
+                                    className={`py-1 rounded text-center text-xs font-bold transition-all ${
+                                      adjType === 'remove' ? 'bg-red-600 text-white shadow-xs' : 'text-slate-500'
+                                    }`}
+                                  >
+                                    - Remove
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Trips</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="50"
+                                  value={adjAmount}
+                                  onChange={(e) => setAdjAmount(e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-bold"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Mandatory Reason</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Duplicate report detected or missed logging"
+                                value={adjReason}
+                                onChange={(e) => setAdjReason(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700"
+                                required
+                              />
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="submit"
+                                disabled={isSubmittingAdj || !adjDriverId}
+                                className="flex-1 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg py-2 font-bold uppercase shadow-xs transition-all text-xs"
+                              >
+                                {isSubmittingAdj ? 'Applying...' : `Apply ${adjType === 'add' ? '+' : '-'}${adjAmount || '1'} Trips`}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveAdjustVehicleId(null)}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-2 font-bold text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* Driver Breakdown */}
+                      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span className="font-semibold text-[11px]">Slot 1: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
+                          <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} trips</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-600 border-t border-slate-50 pt-1">
+                          <span className="font-semibold text-[11px]">Slot 2: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
+                          <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} trips</span>
+                        </div>
                       </div>
 
                       {/* Trips List */}

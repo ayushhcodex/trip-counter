@@ -6,7 +6,7 @@ import { checkAuth } from '@/lib/api-middlewares';
 import { logAudit } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
-  const { errorResponse } = await checkAuth(['SUPER_ADMIN', 'ADMIN']);
+  const { errorResponse } = await checkAuth(['SUPER_ADMIN', 'ADMIN', 'SUPERVISOR']);
   if (errorResponse) return errorResponse;
 
   try {

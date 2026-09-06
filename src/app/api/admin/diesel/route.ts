@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['SUPERVISOR', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['SUPERVISOR', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
