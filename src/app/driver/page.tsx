@@ -85,7 +85,7 @@ export default function DriverDashboard() {
       const notifRes = await fetch('/api/notifications');
       if (notifRes.ok) {
         const notifData = await notifRes.json();
-        const hasUnread = notifData.notifications.some((n: any) => !n.readAt);
+        const hasUnread = (notifData.notifications || []).some((n: any) => !n.readAt);
         setUnreadNotifications(hasUnread);
       }
     } catch (error) {
