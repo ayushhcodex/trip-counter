@@ -290,6 +290,13 @@ export default function DriverHistory() {
           <span>My Trips</span>
         </button>
         <button
+          onClick={() => router.push('/driver/diesel')}
+          className="flex flex-col items-center text-slate-400 hover:text-blue-900 text-xs font-semibold"
+        >
+          <span className="text-lg">⛽</span>
+          <span>Diesel</span>
+        </button>
+        <button
           onClick={() => router.push('/driver/notifications')}
           className="flex flex-col items-center text-slate-400 text-xs font-semibold"
         >

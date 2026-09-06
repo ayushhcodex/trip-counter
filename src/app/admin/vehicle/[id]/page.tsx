@@ -38,6 +38,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true);
   const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
   const [adjustments, setAdjustments] = useState<AdjustmentItem[]>([]);
+  const [dieselLogs, setDieselLogs] = useState<any[]>([]);
   
   const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,6 +51,12 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [submittingAdj, setSubmittingAdj] = useState(false);
   const [submittingVerify, setSubmittingVerify] = useState(false);
+
+  // Form states for diesel entry
+  const [dieselDriverId, setDieselDriverId] = useState('');
+  const [dieselLitres, setDieselLitres] = useState('');
+  const [dieselNotes, setDieselNotes] = useState('');
+  const [submittingDiesel, setSubmittingDiesel] = useState(false);
 
   const loadVehicleDetails = async () => {
     setLoading(true);
@@ -64,8 +71,10 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
           // Set default driver selection to driver 1 if available
           if (found.driver1 && !targetDriverId) {
             setTargetDriverId(found.driver1.id);
+            setDieselDriverId(found.driver1.id);
           } else if (found.driver2 && !targetDriverId) {
             setTargetDriverId(found.driver2.id);
+            setDieselDriverId(found.driver2.id);
           }
         } else {
           setErrorMsg('Vehicle not assigned to you or does not exist.');
@@ -73,22 +82,17 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
       }
 
       // Fetch adjustments for this vehicle on this date
-      const historyRes = await fetch(`/api/trips/history`); // Helper query or fallback list
-      // To get adjustments specifically for this vehicle/date, we query notifications or fetch from list
-      // Let's call our main history or query adjustments directly
-      // Since we don't have a direct admin adjustments endpoint, let's build it or fetch from vehicles api if we add it there.
-      // Wait, we can fetch all adjustments by querying users or from notifications, but actually let's implement a direct query:
-      // Let's make an API call to get adjustments for this vehicle & date. Let's fetch all adjustments
-      // Or we can just build a small API endpoint for it. But wait, we can also retrieve it directly!
-      // Let's create an API route /api/admin/adjustments?vehicleId=...&date=... or we can fetch it as part of vehicles statistics.
-      // Actually, let's fetch adjustments via a simple query we can perform inside /api/admin/vehicles or build a small adjustments fetch endpoint.
-      // Wait, we can modify our /api/admin/vehicles route or create a simple route `/api/admin/adjustments` which returns adjustments.
-      // Let's create `/api/admin/adjustments` endpoint! It will make the detail page 100% clean and correct.
-      // Let's query `/api/admin/adjustments?vehicleId=...&date=...`.
       const adjRes = await fetch(`/api/admin/adjustments?vehicleId=${vehicleId}&date=${selectedDate}`);
       if (adjRes.ok) {
         const adjData = await adjRes.json();
         setAdjustments(adjData.adjustments || []);
+      }
+
+      // Fetch diesel logs for this vehicle on this date
+      const dieselRes = await fetch(`/api/admin/diesel?vehicleId=${vehicleId}&date=${selectedDate}`);
+      if (dieselRes.ok) {
+        const dieselData = await dieselRes.json();
+        setDieselLogs(dieselData.entries || []);
       }
     } catch (error) {
       console.error('Failed to load vehicle details:', error);
@@ -173,6 +177,47 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
       setErrorMsg('Network error. Try again.');
     } finally {
       setSubmittingAdj(false);
+    }
+  };
+
+  // Handle diesel entry submission
+  const handleRecordDiesel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setActionSuccess('');
+
+    if (!dieselDriverId || !dieselLitres || isNaN(parseFloat(dieselLitres))) {
+      setErrorMsg('Please select a driver and enter valid litres.');
+      return;
+    }
+
+    setSubmittingDiesel(true);
+    try {
+      const res = await fetch('/api/admin/diesel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId,
+          driverId: dieselDriverId,
+          date: selectedDate,
+          litres: dieselLitres,
+          notes: dieselNotes,
+        }),
+      });
+
+      if (res.ok) {
+        setActionSuccess('Diesel entry recorded successfully.');
+        setDieselLitres('');
+        setDieselNotes('');
+        await loadVehicleDetails();
+      } else {
+        const err = await res.json();
+        setErrorMsg(err.error || 'Failed to record diesel entry.');
+      }
+    } catch (error) {
+      setErrorMsg('Network error. Try again.');
+    } finally {
+      setSubmittingDiesel(false);
     }
   };
 
@@ -350,10 +395,49 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                   </div>
                 )}
               </div>
+
+              {/* Diesel Fillings History */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
+                  Diesel logs (Fuel)
+                </h3>
+                {dieselLogs.length === 0 ? (
+                  <p className="text-center text-xs text-slate-400 py-4 font-semibold">
+                    No diesel entries logged on this date.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {dieselLogs.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full font-black text-xs">
+                            {parseFloat(entry.litres).toFixed(2)} Litres
+                          </span>
+                          <span className="text-slate-400 text-[10px]">
+                            By {entry.adminName}
+                          </span>
+                        </div>
+                        <p className="text-slate-700 font-semibold text-xs">
+                          Driver: {entry.driverName} ({entry.driverUsername})
+                        </p>
+                        {entry.notes && (
+                          <p className="text-slate-600 bg-white p-2.5 rounded border border-slate-200 italic text-[11px]">
+                            "{entry.notes}"
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Column 3: Adjustment Control Panel */}
+            {/* Column 3: Control Panels */}
             <div className="space-y-6">
+              {/* Adjust Trip Count */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
                   Adjust Trip Count
@@ -425,6 +509,61 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                     className="w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                   >
                     {submittingAdj ? 'Submitting...' : 'Apply Adjustment'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Record Diesel Form Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
+                  Update Diesel Log
+                </h3>
+
+                <form onSubmit={handleRecordDiesel} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">Target Driver</label>
+                    <select
+                      value={dieselDriverId}
+                      onChange={(e) => setDieselDriverId(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-semibold"
+                    >
+                      <option value="">Select Driver</option>
+                      {vehicle.driver1 && <option value={vehicle.driver1.id}>{vehicle.driver1.name}</option>}
+                      {vehicle.driver2 && <option value={vehicle.driver2.id}>{vehicle.driver2.name}</option>}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">Diesel Taken (Litres)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.1"
+                      placeholder="e.g. 45.50"
+                      value={dieselLitres}
+                      onChange={(e) => setDieselLitres(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-bold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">Notes / Receipt Ref (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Full tank at station #4"
+                      value={dieselNotes}
+                      onChange={(e) => setDieselNotes(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingDiesel || !dieselDriverId}
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg py-2.5 font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+                  >
+                    {submittingDiesel ? 'Saving...' : 'Record Diesel Litres'}
                   </button>
                 </form>
               </div>

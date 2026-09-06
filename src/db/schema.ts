@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, integer, pgEnum, date, jsonb, index, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer, pgEnum, date, jsonb, index, unique, numeric } from 'drizzle-orm/pg-core';
 
 // Role and Status Enums
 export const userRoleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'DRIVER']);
@@ -127,3 +127,19 @@ export const auditLogs = pgTable('audit_logs', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 11. Diesel Entries Table
+export const dieselEntries = pgTable('diesel_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  driverId: uuid('driver_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  vehicleId: uuid('vehicle_id').references(() => vehicles.id, { onDelete: 'set null' }),
+  adminId: uuid('admin_id').references(() => users.id, { onDelete: 'restrict' }).notNull(),
+  date: date('date').notNull(),
+  litres: numeric('litres', { precision: 10, scale: 2 }).notNull(),
+  notes: varchar('notes', { length: 500 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_diesel_driver_date').on(table.driverId, table.date),
+  index('idx_diesel_vehicle_date').on(table.vehicleId, table.date),
+]);

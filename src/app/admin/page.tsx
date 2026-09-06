@@ -234,8 +234,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end text-xs font-bold text-blue-900 uppercase">
-                  Verify & Adjust →
+                <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center text-xs font-bold uppercase">
+                  <span className="text-emerald-700">⛽ Record Diesel</span>
+                  <span className="text-blue-900">Manage & Verify →</span>
                 </div>
               </div>
             ))}

@@ -62,9 +62,12 @@ export async function clearSession(): Promise<void> {
 export async function setSessionCookie(payload: SessionPayload): Promise<void> {
   const token = signToken(payload);
   const cookieStore = await cookies();
+  // Use secure cookies in production unless explicitly set to false (e.g. HTTP production deployments)
+  const isSecure = process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIE !== 'false';
+
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 days

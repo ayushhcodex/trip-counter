@@ -163,7 +163,24 @@ async function setupSupabaseSchema() {
       );
     `;
 
-    console.log('✅ All 10 Supabase Database Tables and Indexes Created Successfully!');
+    // 12. Create Diesel Entries Table
+    await client`
+      CREATE TABLE IF NOT EXISTS diesel_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        driver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
+        admin_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        date DATE NOT NULL,
+        litres NUMERIC(10, 2) NOT NULL,
+        notes VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+    `;
+    await client`CREATE INDEX IF NOT EXISTS idx_diesel_driver_date ON diesel_entries(driver_id, date);`;
+    await client`CREATE INDEX IF NOT EXISTS idx_diesel_vehicle_date ON diesel_entries(vehicle_id, date);`;
+
+    console.log('✅ All Database Tables and Indexes Created Successfully!');
 
     // Seed Super Admin
     const adminEmail = 'superadmin@tripcounter.org';

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, ilike } from 'drizzle-orm';
 import { comparePassword, setSessionCookie } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 
@@ -10,19 +10,49 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { usernameOrEmail, password } = body;
 
-    if (!usernameOrEmail || !password) {
+    const cleanInput = (usernameOrEmail || '').trim();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanInput || !cleanPassword) {
       return NextResponse.json(
         { error: 'Username/Email and password are required.' },
         { status: 400 }
       );
     }
 
-    // Fetch user from DB
-    const [user] = await db
+    // 1. Fetch user from DB case-insensitively
+    let [user] = await db
       .select()
       .from(users)
-      .where(eq(users.usernameOrEmail, usernameOrEmail))
+      .where(ilike(users.usernameOrEmail, cleanInput))
       .limit(1);
+
+    // If not found and looks like driver ID (e.g. drv1, drv01, drv001, drv0001)
+    if (!user) {
+      const match = cleanInput.match(/^drv0*(\d+)$/i);
+      if (match) {
+        const num = match[1];
+        const pad3 = `drv${num.padStart(3, '0')}`;
+        const pad4 = `drv${num.padStart(4, '0')}`;
+        const candidates = await db
+          .select()
+          .from(users)
+          .where(ilike(users.usernameOrEmail, pad3))
+          .limit(1);
+        if (candidates.length > 0) {
+          user = candidates[0];
+        } else {
+          const candidates4 = await db
+            .select()
+            .from(users)
+            .where(ilike(users.usernameOrEmail, pad4))
+            .limit(1);
+          if (candidates4.length > 0) {
+            user = candidates4[0];
+          }
+        }
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
@@ -36,8 +66,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Compare passwords
-    const passwordMatch = await comparePassword(password, user.passwordHash);
+    // Compare passwords (also check case-corrected Trip@ if user typed lowercase trip@)
+    let passwordMatch = await comparePassword(cleanPassword, user.passwordHash);
+    if (!passwordMatch && cleanPassword.toLowerCase().startsWith('trip@')) {
+      const corrected = 'Trip@' + cleanPassword.slice(5);
+      passwordMatch = await comparePassword(corrected, user.passwordHash);
+    }
+
     if (!passwordMatch) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
     }

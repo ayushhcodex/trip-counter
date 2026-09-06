@@ -10,11 +10,16 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     
-    if (!usernameOrEmail || !password) {
+    const cleanUser = usernameOrEmail.trim();
+    const cleanPass = password.trim();
+
+    if (!cleanUser || !cleanPass) {
       setErrorMsg('Please enter both your ID/Username and Password.');
       return;
     }
@@ -25,7 +30,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrEmail, password }),
+        body: JSON.stringify({ usernameOrEmail: cleanUser, password: cleanPass }),
       });
 
       if (!res.ok) {
@@ -37,16 +42,17 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (data.success) {
-        // Successful login, redirect depending on role
+        // Successful login, perform full window navigation to ensure session cookie is committed
         const role = data.user.role;
         if (role === 'SUPER_ADMIN') {
-          router.push('/superadmin');
+          window.location.href = '/superadmin';
         } else if (role === 'ADMIN') {
-          router.push('/admin');
+          window.location.href = '/admin';
         } else if (role === 'DRIVER') {
-          router.push('/driver');
+          window.location.href = '/driver';
         } else {
           setErrorMsg('Unauthorized account role.');
+          setSubmitting(false);
         }
       }
     } catch (err) {
@@ -81,20 +87,35 @@ export default function LoginPage() {
               type="text"
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
-              placeholder="e.g. DRV001 or admin@tripcounter.org"
+              placeholder="e.g. drv001 or superadmin@tripcounter.org"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs uppercase font-bold tracking-wider text-slate-400 mb-1.5">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs uppercase font-bold tracking-wider text-slate-400">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-xs text-blue-800 font-semibold hover:underline"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
             />
           </div>
