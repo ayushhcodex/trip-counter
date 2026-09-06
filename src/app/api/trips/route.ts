@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { trips, vehicleDriverAssignments, vehicles, users } from '@/db/schema';
+import { trips, vehicleDriverAssignments, vehicles, users, dailyVehicleVerifications } from '@/db/schema';
 import { eq, and, isNull, gte, lte, desc } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
 import { getDateBoundaries, getLocalDateString } from '@/lib/timezone';
@@ -165,6 +165,18 @@ export async function POST(req: NextRequest) {
         message: 'Trip was already recorded successfully.',
       });
     }
+
+    // 5. Invalidate existing verification for this vehicle on this date since new trips were recorded
+    const tripDate = getLocalDateString(tripCompletedTime);
+    await db
+      .update(dailyVehicleVerifications)
+      .set({ status: 'UNVERIFIED' })
+      .where(
+        and(
+          eq(dailyVehicleVerifications.vehicleId, assignment.vehicleId),
+          eq(dailyVehicleVerifications.date, tripDate)
+        )
+      );
 
     // Log trip creation in audit logs
     await logAudit({

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { trips, vehicleDriverAssignments, vehicles, users } from '@/db/schema';
+import { trips, vehicleDriverAssignments, vehicles, users, dailyVehicleVerifications } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
+import { getLocalDateString } from '@/lib/timezone';
 import { logAudit } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
@@ -76,16 +77,18 @@ export async function POST(req: NextRequest) {
     // 4. Batch transaction for inserting trips
     const processedCount = await db.transaction(async (tx) => {
       let insertedCount = 0;
+      const affectedDates = new Set<string>();
       
       for (const trip of offlineTrips) {
         if (!trip.idempotencyKey || !trip.completedAt) continue;
 
+        const tripDate = new Date(trip.completedAt);
         const [inserted] = await tx
           .insert(trips)
           .values({
             vehicleId: assignment.vehicleId,
             driverId: actor!.userId,
-            completedAt: new Date(trip.completedAt),
+            completedAt: tripDate,
             idempotencyKey: trip.idempotencyKey,
           })
           .onConflictDoNothing()
@@ -93,6 +96,22 @@ export async function POST(req: NextRequest) {
 
         if (inserted) {
           insertedCount++;
+          affectedDates.add(getLocalDateString(tripDate));
+        }
+      }
+
+      // Invalidate any existing verification for this vehicle on the affected dates
+      if (insertedCount > 0 && affectedDates.size > 0) {
+        for (const dateStr of affectedDates) {
+          await tx
+            .update(dailyVehicleVerifications)
+            .set({ status: 'UNVERIFIED' })
+            .where(
+              and(
+                eq(dailyVehicleVerifications.vehicleId, assignment.vehicleId),
+                eq(dailyVehicleVerifications.date, dateStr)
+              )
+            );
         }
       }
       

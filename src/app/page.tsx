@@ -12,7 +12,7 @@ export default async function IndexPage() {
 
   if (session.role === 'SUPER_ADMIN') {
     redirect('/superadmin');
-  } else if (session.role === 'ADMIN') {
+  } else if (session.role === 'ADMIN' || session.role === 'SUPERVISOR') {
     redirect('/admin');
   } else if (session.role === 'DRIVER') {
     redirect('/driver');

@@ -7,7 +7,7 @@ import { logAudit } from '@/lib/audit';
 import { getLocalDateString } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       .where(eq(users.role, 'DRIVER'));
 
     // If an ADMIN has no assigned vehicles, return empty list safely
-    if (actor!.role === 'ADMIN' && vehicleIds.length === 0) {
+    if (actor!.role !== 'SUPER_ADMIN' && vehicleIds.length === 0) {
       return NextResponse.json({
         success: true,
         entries: [],
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     }
 
     // If an ADMIN specifies a vehicleId they are not assigned to, reject access
-    if (actor!.role === 'ADMIN' && vehicleId && !vehicleIds.includes(vehicleId)) {
+    if (actor!.role !== 'SUPER_ADMIN' && vehicleId && !vehicleIds.includes(vehicleId)) {
       return NextResponse.json({
         success: true,
         entries: [],
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
     const conditions = [];
 
     // Push vehicle authorization into SQL query
-    if (actor!.role === 'ADMIN') {
+    if (actor!.role !== 'SUPER_ADMIN') {
       if (vehicleId) {
         conditions.push(eq(dieselEntries.vehicleId, vehicleId));
       } else {
@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       vehicleNum = v.vehicleNumber;
 
       // Ensure ADMIN has assignment to this vehicle
-      if (actor!.role === 'ADMIN') {
+      if (actor!.role !== 'SUPER_ADMIN') {
         const [assigned] = await db
           .select()
           .from(adminVehicleAssignments)
@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Check if ADMIN was assigned to the existing vehicle
-      if (actor!.role === 'ADMIN' && existing.vehicleId) {
+      if (actor!.role !== 'SUPER_ADMIN' && existing.vehicleId) {
         const [assignedExisting] = await db
           .select()
           .from(adminVehicleAssignments)
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -313,7 +313,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Verify ADMIN vehicle assignment
-    if (actor!.role === 'ADMIN' && existing.vehicleId) {
+    if (actor!.role !== 'SUPER_ADMIN' && existing.vehicleId) {
       const [assigned] = await db
         .select()
         .from(adminVehicleAssignments)

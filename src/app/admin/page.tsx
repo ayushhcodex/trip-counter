@@ -1,348 +1,495 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface VehicleStat {
+interface UserProfile {
+  name: string;
+  role: 'ADMIN' | 'SUPERVISOR' | 'SUPER_ADMIN';
+}
+
+interface Trip {
+  id: string;
+  driverId: string;
+  driverName: string;
+  completedAt: string;
+  shift: string;
+}
+
+interface Vehicle {
   id: string;
   vehicleNumber: string;
-  status: string;
+  status: 'ACTIVE' | 'BREAKDOWN' | 'INACTIVE';
   reportedCount: number;
   adjustmentTotal: number;
   verifiedCount: number;
-  verificationStatus: string;
-  driver1: { name: string; reportedCount: number } | null;
-  driver2: { name: string; reportedCount: number } | null;
+  verificationStatus: 'VERIFIED' | 'UNVERIFIED';
+  driver1: { id: string; name: string; reportedCount: number } | null;
+  driver2: { id: string; name: string; reportedCount: number } | null;
+  trips: Trip[];
 }
+
+interface VehiclesResponse {
+  success: boolean;
+  dateRange: { start: string; end: string };
+  vehicles: Vehicle[];
+}
+
+type DateRange = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [adminName, setAdminName] = useState('');
-  const [vehicles, setVehicles] = useState<VehicleStat[]>([]);
-  const [range, setRange] = useState('today'); // today, yesterday, week, month, custom
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchStats = useCallback(async (currentRange: string, silent = false, customStart = '', customEnd = '') => {
-    if (silent) {
-      setIsRefreshing(true);
-    }
-    try {
-      let url = `/api/admin/vehicles?range=${currentRange}&_t=${Date.now()}`;
-      if (currentRange === 'custom') {
-        url += `&startDate=${customStart}&endDate=${customEnd}`;
-      }
-      const statsRes = await fetch(url, { cache: 'no-store' });
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setVehicles(statsData.vehicles || []);
-        setErrorMsg('');
-        setLastUpdated(new Date());
-      } else {
-        const errData = await statsRes.json().catch(() => ({}));
-        setErrorMsg(errData.error || 'Failed to fetch vehicle dashboard statistics.');
-      }
-    } catch (error) {
-      console.error('Failed to load admin stats:', error);
-      setErrorMsg('Failed to fetch vehicle dashboard statistics.');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<DateRange>('today');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [dateRangeInfo, setDateRangeInfo] = useState<{ start: string; end: string } | null>(null);
+  
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
+
+  const cacheRef = useRef<Record<string, VehiclesResponse>>({});
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+
+  const getCacheKey = useCallback((tab: DateRange, start: string, end: string) => {
+    return tab === 'custom' ? `${tab}-${start}-${end}` : tab;
   }, []);
 
-  const handleRangeSelect = (newRange: string) => {
-    if (newRange === range) return;
-    setRange(newRange);
-    if (newRange !== 'custom') {
-      setLoading(true);
-      fetchStats(newRange, false);
+  const fetchVehicles = useCallback(async (
+    tab: DateRange, 
+    start: string, 
+    end: string, 
+    isBackground: boolean = false
+  ) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  };
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-  // Initial load and live polling
+    const cacheKey = getCacheKey(tab, start, end);
+    const cachedData = cacheRef.current[cacheKey];
+
+    if (cachedData && !isBackground) {
+      setVehicles(cachedData.vehicles);
+      setDateRangeInfo(cachedData.dateRange);
+      setIsLoading(false);
+      setIsRefreshing(true);
+    } else if (!isBackground) {
+      setIsLoading(true);
+      setIsRefreshing(false);
+    }
+
+    try {
+      let url = `/api/admin/vehicles?range=${tab}&_t=${Date.now()}`;
+      if (tab === 'custom' && start && end) {
+        url += `&startDate=${start}&endDate=${end}`;
+      } else if (tab === 'custom') {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return; // Don't fetch if custom range is incomplete
+      }
+
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error('Failed to fetch vehicles');
+      
+      const data: VehiclesResponse = await res.json();
+      
+      cacheRef.current[cacheKey] = data;
+      setVehicles(data.vehicles);
+      setDateRangeInfo(data.dateRange);
+      setLastUpdated(new Date());
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Fetch vehicles error:', err);
+      }
+    } finally {
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    }
+  }, [getCacheKey]);
+
   useEffect(() => {
-    let active = true;
-
-    const init = async () => {
-      try {
-        const profRes = await fetch('/api/auth/me', { cache: 'no-store' });
-        if (!profRes.ok) {
-          router.push('/login');
-          return;
+    let isMounted = true;
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data?.user) {
+          setUserProfile(data.user);
         }
-        const profData = await profRes.json();
-        if (!active) return;
-        setAdminName(profData.user?.name || 'Admin');
-      } catch (err) {
-        console.error('Failed to load profile:', err);
-      }
-
-      if (active && range !== 'custom') {
-        await fetchStats(range, false);
-      }
-    };
-
-    init();
-
-    // Live polling every 5 seconds
-    const interval = setInterval(() => {
-      if (range !== 'custom' && typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchStats(range, true);
-      }
-    }, 5000);
-
-    const handleVisibilityChange = () => {
-      if (range !== 'custom' && document.visibilityState === 'visible') {
-        fetchStats(range, true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+      })
+      .catch((err) => console.error('Failed to fetch profile', err));
     return () => {
-      active = false;
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      isMounted = false;
     };
-  }, [range, router, fetchStats]);
+  }, []);
 
-  const handleCustomRangeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!startDate || !endDate) {
-      setErrorMsg('Please specify both Start Date and End Date.');
+  useEffect(() => {
+    let isMounted = true;
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        fetchVehicles(activeTab, customStartDate, customEndDate, false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, customStartDate, customEndDate, fetchVehicles]);
+
+  useEffect(() => {
+    if (activeTab === 'custom') {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+      }
       return;
     }
-    setLoading(true);
-    fetchStats('custom', false, startDate, endDate);
-  };
 
-  const handleManualRefresh = () => {
-    if (range === 'custom') {
-      fetchStats('custom', true, startDate, endDate);
-    } else {
-      fetchStats(range, true);
+    pollingTimerRef.current = setInterval(() => {
+      fetchVehicles(activeTab, customStartDate, customEndDate, true);
+    }, 5000);
+
+    return () => {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+      }
+    };
+  }, [activeTab, customStartDate, customEndDate, fetchVehicles]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchVehicles(activeTab, customStartDate, customEndDate, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeTab, customStartDate, customEndDate, fetchVehicles]);
+
+  const handleTabChange = useCallback((tab: DateRange) => {
+    setActiveTab(tab);
+    setExpandedVehicleId(null);
+  }, []);
+
+  const handleCustomFilter = useCallback(() => {
+    if (customStartDate && customEndDate) {
+      fetchVehicles('custom', customStartDate, customEndDate, false);
     }
-  };
+  }, [customStartDate, customEndDate, fetchVehicles]);
 
-  const handleLogout = async () => {
+  const handleVerify = useCallback(async (vehicleId: string) => {
+    if (!dateRangeInfo) return;
+    try {
+      const res = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleId, date: dateRangeInfo.start })
+      });
+      if (res.ok) {
+        // Refresh silently
+        fetchVehicles(activeTab, customStartDate, customEndDate, true);
+      }
+    } catch (err) {
+      console.error('Failed to verify', err);
+    }
+  }, [dateRangeInfo, activeTab, customStartDate, customEndDate, fetchVehicles]);
+
+  const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
-  };
+  }, [router]);
+
+  const formatTime = useCallback((isoString: string) => {
+    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }, []);
+
+  const filteredVehicles = vehicles.filter(v => 
+    v.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.driver1?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.driver2?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const isSingleDay = activeTab === 'today' || activeTab === 'yesterday';
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-100 text-slate-800">
-      {/* Header */}
-      <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-md">
-        <div>
-          <h1 className="font-extrabold text-xl tracking-tight text-blue-400">TripCounter</h1>
-          <p className="text-xs text-slate-400 font-semibold">Admin Panel • Hello, {adminName}</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between">
+        <div className="flex flex-col">
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">TripCounter</h1>
+          {userProfile && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                userProfile.role === 'SUPERVISOR' ? 'bg-amber-100 text-amber-800' :
+                userProfile.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                {userProfile.role.replace('_', ' ')}
+              </span>
+              <span className="text-xs text-slate-500 font-semibold truncate max-w-[100px]">
+                {userProfile.name}
+              </span>
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-3">
-          <button
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <span className="text-[10px] text-slate-500 font-semibold">
+              Live: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
+          <button 
             onClick={handleLogout}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+            className="text-xs font-bold text-red-600 active:text-red-800 py-1"
           >
             Logout
           </button>
         </div>
       </header>
 
-      {/* Toolbar / Filters */}
-      <section className="bg-white border-b border-slate-200 px-6 py-4 space-y-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex bg-slate-100 p-1.5 rounded-lg border border-slate-200">
-            {['today', 'yesterday', 'week', 'month', 'custom'].map((r) => (
-              <button
-                key={r}
-                onClick={() => handleRangeSelect(r)}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${
-                  range === r
-                    ? 'bg-blue-900 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-
-          {/* Live Status & Refresh */}
-          <div className="flex items-center space-x-2.5">
-            {range !== 'custom' && (
-              <div className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>Live</span>
-              </div>
-            )}
-            {lastUpdated && (
-              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-                Updated {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
+      {/* Tab Bar */}
+      <div className="sticky top-[68px] z-40 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2">
+          {['today', 'yesterday', 'week', 'month', 'custom'].map((tab) => (
             <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing || loading}
-              className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
-              title="Refresh vehicle stats now"
+              key={tab}
+              onClick={() => handleTabChange(tab as DateRange)}
+              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+                activeTab === tab 
+                  ? 'bg-blue-900 text-white shadow-md' 
+                  : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+              }`}
             >
-              <svg
-                className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
+          ))}
+        </div>
+        {(isLoading || isRefreshing) && (
+          <div className="h-0.5 w-full bg-slate-100 overflow-hidden">
+            <div className="h-full bg-blue-500 animate-pulse w-1/3 rounded-r-full"></div>
           </div>
+        )}
+      </div>
+
+      <main className="flex-1 p-4 pb-20 max-w-lg mx-auto w-full">
+        
+        {/* Custom Range Selector */}
+        {activeTab === 'custom' && (
+          <div className="mb-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Start</label>
+                <input 
+                  type="date" 
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">End</label>
+                <input 
+                  type="date" 
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full text-sm bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold"
+                />
+              </div>
+              <button 
+                onClick={handleCustomFilter}
+                className="bg-blue-900 text-white rounded-lg p-2 px-4 font-bold text-sm h-[38px] active:scale-95 transition-transform"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        <div className="mb-4 relative">
+          <input 
+            type="text" 
+            placeholder="Search vehicle or driver..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-10 pr-4 shadow-sm text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <svg className="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
 
-        {/* Custom Range Picker */}
-        {range === 'custom' && (
-          <form onSubmit={handleCustomRangeSubmit} className="flex flex-wrap items-end gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div>
-              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700"
-              />
-            </div>
-            <button
-              type="submit"
-              className="bg-blue-900 hover:bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm"
-            >
-              Filter
-            </button>
-          </form>
-        )}
-      </section>
-
-      {/* Main Grid */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
-        {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold mb-6 text-center">
-            {errorMsg}
+        {/* Vehicle List */}
+        {isLoading && !isRefreshing && vehicles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-900 rounded-full animate-spin"></div>
+            <p className="mt-4 text-sm font-semibold text-slate-500">Loading vehicles...</p>
           </div>
-        )}
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
-            <div className="w-8 h-8 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-3 text-slate-500 text-xs font-semibold">Loading stats...</p>
-          </div>
-        ) : vehicles.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-400 text-xs shadow-sm font-semibold">
-            No assigned vehicles found for your admin account.
+        ) : filteredVehicles.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100">
+            <p className="text-slate-500 font-semibold">No assigned vehicles found.</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {vehicles.map((v) => (
-              <div
-                key={v.id}
-                onClick={() => router.push(`/admin/vehicle/${v.id}`)}
-                className="bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 shadow-sm transition-all cursor-pointer flex flex-col justify-between"
-              >
-                <div>
-                  {/* Title Row */}
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">
-                      {v.vehicleNumber}
-                    </h3>
-                    <div className="flex items-center space-x-1.5">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          v.status === 'ACTIVE'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : v.status === 'BREAKDOWN'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {v.status}
-                      </span>
-                      {range !== 'week' && range !== 'month' && range !== 'custom' && (
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            v.verificationStatus === 'VERIFIED'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {v.verificationStatus}
+          <div className="flex flex-col gap-3">
+            {filteredVehicles.map(vehicle => {
+              const isExpanded = expandedVehicleId === vehicle.id;
+              
+              const driversText = [
+                vehicle.driver1?.name,
+                vehicle.driver2?.name
+              ].filter(Boolean).join(' & ') || 'Unassigned';
+
+              const statusColor = 
+                vehicle.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                vehicle.status === 'BREAKDOWN' ? 'bg-amber-100 text-amber-800' :
+                'bg-slate-100 text-slate-800';
+
+              return (
+                <div key={vehicle.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  {/* Strip Header (Clickable) */}
+                  <div 
+                    onClick={() => setExpandedVehicleId(isExpanded ? null : vehicle.id)}
+                    className="p-4 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight truncate">
+                          {vehicle.vehicleNumber}
+                        </h2>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
+                          {vehicle.status}
                         </span>
-                      )}
+                      </div>
+                      <p className="text-xs text-slate-500 font-semibold truncate">
+                        {driversText}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-blue-800 to-blue-950 shadow-inner flex-shrink-0 ml-3">
+                      <span className="text-xl font-black text-white">{vehicle.reportedCount}</span>
                     </div>
                   </div>
 
-                  {/* Count Stats Grid */}
-                  <div className="grid grid-cols-3 gap-2.5 text-center bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block leading-none">Reported</span>
-                      <span className="text-base font-black text-slate-800 block mt-1">{v.reportedCount}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block leading-none">Adjusted</span>
-                      <span className="text-base font-black text-slate-800 block mt-1">
-                        {v.adjustmentTotal > 0 ? `+${v.adjustmentTotal}` : v.adjustmentTotal}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block leading-none text-blue-900">Verified</span>
-                      <span className="text-base font-black text-blue-900 block mt-1">{v.verifiedCount}</span>
-                    </div>
-                  </div>
+                  {/* Accordion Content */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/50 pt-3">
+                      
+                      {/* Summary Row */}
+                      <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                        <div className="text-center">
+                          <div className="text-[10px] uppercase font-bold text-slate-400">Reported</div>
+                          <div className="text-lg font-black text-slate-800">{vehicle.reportedCount}</div>
+                        </div>
+                        <div className="w-px h-8 bg-slate-200"></div>
+                        <div className="text-center">
+                          <div className="text-[10px] uppercase font-bold text-slate-400">Adjusted</div>
+                          <div className="text-lg font-black text-slate-800">{vehicle.adjustmentTotal}</div>
+                        </div>
+                        <div className="w-px h-8 bg-slate-200"></div>
+                        <div className="text-center">
+                          <div className="text-[10px] uppercase font-bold text-slate-400">Verified</div>
+                          <div className="text-lg font-black text-slate-800">{vehicle.verifiedCount}</div>
+                        </div>
+                      </div>
 
-                  {/* Driver List */}
-                  <div className="space-y-1.5 text-xs border-t border-slate-100 pt-3">
-                    <div className="flex justify-between items-center text-slate-600">
-                      <span>Driver 1:</span>
-                      <span className="font-semibold">
-                        {v.driver1 ? `${v.driver1.name} (${v.driver1.reportedCount} trips)` : 'Unassigned'}
-                      </span>
+                      {/* Action Buttons */}
+                      <div className="flex flex-col gap-2 mb-4">
+                        {isSingleDay && vehicle.verificationStatus !== 'VERIFIED' && (
+                          <button
+                            onClick={() => handleVerify(vehicle.id)}
+                            className="w-full bg-emerald-600 active:bg-emerald-700 text-white py-3 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                            Verify Today&apos;s Trips
+                          </button>
+                        )}
+
+                        {vehicle.verificationStatus === 'VERIFIED' && isSingleDay && (
+                          <div className="w-full bg-emerald-50 text-emerald-700 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                            Verified
+                          </div>
+                        )}
+
+                        {(userProfile?.role === 'SUPERVISOR' || userProfile?.role === 'SUPER_ADMIN') && (
+                          <button
+                            onClick={() => router.push(`/admin/vehicle/${vehicle.id}`)}
+                            className="w-full bg-slate-800 active:bg-slate-900 text-white py-3 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+                          >
+                            <span>⛽</span> Record Diesel
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Trips List */}
+                      <div>
+                        <h3 className="text-xs font-bold uppercase text-slate-500 mb-2 px-1">Trip History</h3>
+                        {vehicle.trips.length === 0 ? (
+                          <div className="bg-white p-4 rounded-xl border border-slate-100 text-center text-sm font-semibold text-slate-400">
+                            No trips recorded
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {vehicle.trips.map((trip, idx) => (
+                              <div key={trip.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3">
+                                <div className="bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center font-black text-slate-600 text-sm flex-shrink-0">
+                                  #{idx + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-bold text-slate-800 text-sm truncate">{trip.driverName}</span>
+                                    <span className="text-xs font-semibold text-slate-500 flex-shrink-0">
+                                      {formatTime(trip.completedAt)}
+                                    </span>
+                                  </div>
+                                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    trip.shift.includes('1') ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                  }`}>
+                                    {trip.shift}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
                     </div>
-                    <div className="flex justify-between items-center text-slate-600">
-                      <span>Driver 2:</span>
-                      <span className="font-semibold">
-                        {v.driver2 ? `${v.driver2.name} (${v.driver2.reportedCount} trips)` : 'Unassigned'}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center text-xs font-bold uppercase">
-                  <span className="text-emerald-700">⛽ Record Diesel</span>
-                  <span className="text-blue-900">Manage & Verify →</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
+      
+      {/* Global Styles for hide-scrollbar */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}} />
     </div>
   );
 }

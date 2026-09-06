@@ -46,7 +46,7 @@ export default function LoginPage() {
         const role = data.user.role;
         if (role === 'SUPER_ADMIN') {
           window.location.href = '/superadmin';
-        } else if (role === 'ADMIN') {
+        } else if (role === 'ADMIN' || role === 'SUPERVISOR') {
           window.location.href = '/admin';
         } else if (role === 'DRIVER') {
           window.location.href = '/driver';

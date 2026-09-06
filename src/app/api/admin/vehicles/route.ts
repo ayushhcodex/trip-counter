@@ -4,12 +4,13 @@ import { vehicles, adminVehicleAssignments, vehicleDriverAssignments, users, tri
 import { eq, and, gte, lte, isNull, sql, inArray } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
 import { getDateBoundaries, getLocalDateString } from '@/lib/timezone';
+import { getShiftInfo } from '@/lib/shifts';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -96,6 +97,7 @@ export async function GET(req: NextRequest) {
       tripsGrouped,
       adjustmentsGrouped,
       verificationsList,
+      tripDetailsList,
     ] = await Promise.all([
       // A. Active driver assignments
       db
@@ -156,6 +158,8 @@ export async function GET(req: NextRequest) {
               status: dailyVehicleVerifications.status,
               verifiedBy: dailyVehicleVerifications.verifiedBy,
               verifiedAt: dailyVehicleVerifications.verifiedAt,
+              reportedTripCount: dailyVehicleVerifications.reportedTripCount,
+              adjustmentTotal: dailyVehicleVerifications.adjustmentTotal,
             })
             .from(dailyVehicleVerifications)
             .where(
@@ -164,6 +168,28 @@ export async function GET(req: NextRequest) {
                 eq(dailyVehicleVerifications.date, startStr)
               )
             )
+        : Promise.resolve([]),
+
+      // E. Individual trip records (for single-day accordion expansion)
+      startStr === endStr
+        ? db
+            .select({
+              id: trips.id,
+              vehicleId: trips.vehicleId,
+              driverId: trips.driverId,
+              driverName: users.name,
+              completedAt: trips.completedAt,
+            })
+            .from(trips)
+            .innerJoin(users, eq(trips.driverId, users.id))
+            .where(
+              and(
+                inArray(trips.vehicleId, vehicleIds),
+                gte(trips.completedAt, startUTC),
+                lte(trips.completedAt, endUTC)
+              )
+            )
+            .orderBy(trips.completedAt)
         : Promise.resolve([]),
     ]);
 
@@ -210,6 +236,25 @@ export async function GET(req: NextRequest) {
       verificationsByVehicle.set(v.vehicleId, v);
     }
 
+    // Map individual trip details by vehicleId (single-day only)
+    const tripDetailsByVehicle = new Map<string, { id: string; driverId: string; driverName: string; completedAt: Date; shift: string }[]>();
+    for (const t of tripDetailsList) {
+      const shiftInfo = getShiftInfo(new Date(t.completedAt));
+      const entry = {
+        id: t.id,
+        driverId: t.driverId,
+        driverName: t.driverName,
+        completedAt: t.completedAt,
+        shift: shiftInfo.shiftName,
+      };
+      const existing = tripDetailsByVehicle.get(t.vehicleId);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        tripDetailsByVehicle.set(t.vehicleId, [entry]);
+      }
+    }
+
     // 4. Populate statistics for each vehicle
     const vehicleStats = targetVehicles.map((vehicle) => {
       const assigned = assignmentsByVehicle.get(vehicle.id);
@@ -223,9 +268,18 @@ export async function GET(req: NextRequest) {
       const adjustmentSum = adjustmentsByVehicle.get(vehicle.id) || 0;
       const verif = verificationsByVehicle.get(vehicle.id);
 
-      const verificationStatus = verif ? verif.status : 'UNVERIFIED';
-      const verifiedBy = verif ? verif.verifiedBy : null;
-      const verifiedAt = verif ? verif.verifiedAt : null;
+      // Check if the current reportedCount and adjustmentTotal match the verified snapshot.
+      // If new trips were logged or adjustments changed, it requires re-verification.
+      const isVerified = Boolean(
+        verif &&
+        verif.status === 'VERIFIED' &&
+        verif.reportedTripCount === reportedCount &&
+        verif.adjustmentTotal === adjustmentSum
+      );
+
+      const verificationStatus = isVerified ? 'VERIFIED' : 'UNVERIFIED';
+      const verifiedBy = isVerified && verif ? verif.verifiedBy : null;
+      const verifiedAt = isVerified && verif ? verif.verifiedAt : null;
 
       return {
         id: vehicle.id,
@@ -239,6 +293,7 @@ export async function GET(req: NextRequest) {
         verifiedAt,
         driver1: driver1 ? { id: driver1.id, name: driver1.name, reportedCount: driver1Trips } : null,
         driver2: driver2 ? { id: driver2.id, name: driver2.name, reportedCount: driver2Trips } : null,
+        trips: tripDetailsByVehicle.get(vehicle.id) || [],
       };
     });
 

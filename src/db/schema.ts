@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, timestamp, integer, pgEnum, date, jsonb, index, unique, numeric } from 'drizzle-orm/pg-core';
 
 // Role and Status Enums
-export const userRoleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'DRIVER']);
+export const userRoleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'SUPERVISOR', 'ADMIN', 'DRIVER']);
 export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'LEAVE', 'INACTIVE']);
 export const vehicleStatusEnum = pgEnum('vehicle_status', ['ACTIVE', 'BREAKDOWN', 'INACTIVE']);
 export const verificationStatusEnum = pgEnum('verification_status', ['UNVERIFIED', 'VERIFIED']);

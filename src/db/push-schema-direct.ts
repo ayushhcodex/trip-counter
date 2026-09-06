@@ -7,7 +7,12 @@ async function setupSupabaseSchema() {
     // 1. Create Enums
     await client`
       DO $$ BEGIN
-        CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'ADMIN', 'DRIVER');
+        CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'SUPERVISOR', 'ADMIN', 'DRIVER');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;
+    `;
+    await client`
+      DO $$ BEGIN
+        ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPERVISOR';
       EXCEPTION WHEN duplicate_object THEN null; END $$;
     `;
     await client`

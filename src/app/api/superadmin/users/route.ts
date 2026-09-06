@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validRoles = ['SUPER_ADMIN', 'ADMIN', 'DRIVER'];
+    const validRoles = ['SUPER_ADMIN', 'SUPERVISOR', 'ADMIN', 'DRIVER'];
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: 'Invalid user role specified.' }, { status: 400 });
     }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         name,
         phone: phone || null,
         passwordHash,
-        role: role as 'SUPER_ADMIN' | 'ADMIN' | 'DRIVER',
+        role: role as 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER',
         status: status || 'ACTIVE',
       })
       .returning({

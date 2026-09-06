@@ -7,7 +7,7 @@ import { getDateBoundaries } from '@/lib/timezone';
 import { logAudit } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
-  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. If ADMIN, assert they have permission for this vehicle
-    if (actor!.role === 'ADMIN') {
+    if (actor!.role !== 'SUPER_ADMIN') {
       const [assigned] = await db
         .select()
         .from(adminVehicleAssignments)

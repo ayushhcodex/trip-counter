@@ -17,6 +17,12 @@ let dieselTableChecked = false;
 export async function ensureDieselTable() {
   if (dieselTableChecked) return;
   try {
+    // Auto-heal: add SUPERVISOR role to enum if not present
+    await client`
+      DO $$ BEGIN
+        ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPERVISOR';
+      EXCEPTION WHEN duplicate_object THEN null; END $$;
+    `;
     await client`
       CREATE TABLE IF NOT EXISTS diesel_entries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

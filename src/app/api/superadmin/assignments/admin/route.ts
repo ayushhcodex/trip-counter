@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
     if (!admin) {
       return NextResponse.json({ error: 'Admin user not found.' }, { status: 404 });
     }
-    if (admin.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'User is not an Admin.' }, { status: 400 });
+    if (admin.role !== 'ADMIN' && admin.role !== 'SUPERVISOR') {
+      return NextResponse.json({ error: 'User is not an Admin or Supervisor.' }, { status: 400 });
     }
 
     // Fetch existing assignments for this admin

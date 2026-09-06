@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
 
 export async function GET(req: NextRequest) {
-  const { errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
+  const { errorResponse } = await checkAuth(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

@@ -8,7 +8,7 @@ const COOKIE_NAME = 'session_token';
 export interface SessionPayload {
   userId: string;
   username: string;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'DRIVER';
+  role: 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER';
 }
 
 export async function hashPassword(password: string): Promise<string> {

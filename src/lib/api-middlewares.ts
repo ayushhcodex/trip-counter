@@ -6,7 +6,7 @@ import { getSession, SessionPayload } from './auth';
  * Returns either the authorized user details or a NextResponse containing the HTTP error.
  */
 export async function checkAuth(
-  allowedRoles?: ('SUPER_ADMIN' | 'ADMIN' | 'DRIVER')[]
+  allowedRoles?: ('SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER')[]
 ): Promise<{
   user: SessionPayload | null;
   errorResponse?: NextResponse;

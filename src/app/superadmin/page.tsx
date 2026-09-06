@@ -8,7 +8,7 @@ interface User {
   usernameOrEmail: string;
   name: string;
   phone: string | null;
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'DRIVER';
+  role: 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER';
   status: 'ACTIVE' | 'LEAVE' | 'INACTIVE';
 }
 
@@ -71,7 +71,7 @@ export default function SuperAdminDashboard() {
   const [userUsername, setUserUsername] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userPassword, setUserPassword] = useState('');
-  const [userRole, setUserRole] = useState<'SUPER_ADMIN' | 'ADMIN' | 'DRIVER'>('DRIVER');
+  const [userRole, setUserRole] = useState<'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER'>('DRIVER');
   const [userStatus, setUserStatus] = useState<'ACTIVE' | 'LEAVE' | 'INACTIVE'>('ACTIVE');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
@@ -367,7 +367,7 @@ export default function SuperAdminDashboard() {
           ].map((t) => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id as any)}
+              onClick={() => setActiveTab(t.id as 'vehicles' | 'users' | 'assignments' | 'audits')}
               className={`py-3.5 px-1.5 border-b-2 text-xs font-bold uppercase tracking-wider transition-all focus:outline-none ${
                 activeTab === t.id
                   ? 'border-blue-900 text-blue-900'
@@ -468,7 +468,21 @@ export default function SuperAdminDashboard() {
                           <tr key={u.id} className="hover:bg-slate-50">
                             <td className="py-3 font-bold text-slate-700">{u.name}</td>
                             <td className="py-3 font-medium text-slate-500">{u.usernameOrEmail}</td>
-                            <td className="py-3 font-semibold text-blue-900">{u.role}</td>
+                            <td className="py-3">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  u.role === 'SUPERVISOR'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : u.role === 'SUPER_ADMIN'
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : u.role === 'ADMIN'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {u.role}
+                              </span>
+                            </td>
                             <td className="py-3">
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -655,11 +669,12 @@ export default function SuperAdminDashboard() {
                       <label className="block font-bold uppercase text-slate-400 mb-1">System Role</label>
                       <select
                         value={userRole}
-                        onChange={(e) => setUserRole(e.target.value as any)}
+                        onChange={(e) => setUserRole(e.target.value as 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
                         <option value="DRIVER">Driver</option>
                         <option value="ADMIN">Admin</option>
+                        <option value="SUPERVISOR">Supervisor</option>
                         <option value="SUPER_ADMIN">Super Admin</option>
                       </select>
                     </div>
@@ -667,7 +682,7 @@ export default function SuperAdminDashboard() {
                       <label className="block font-bold uppercase text-slate-400 mb-1">Availability Status</label>
                       <select
                         value={userStatus}
-                        onChange={(e) => setUserStatus(e.target.value as any)}
+                        onChange={(e) => setUserStatus(e.target.value as 'ACTIVE' | 'LEAVE' | 'INACTIVE')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
                         <option value="ACTIVE">Active</option>
@@ -723,7 +738,7 @@ export default function SuperAdminDashboard() {
                       <label className="block font-bold uppercase text-slate-400 mb-1">Breakdown Status</label>
                       <select
                         value={vehicleStatus}
-                        onChange={(e) => setVehicleStatus(e.target.value as any)}
+                        onChange={(e) => setVehicleStatus(e.target.value as 'ACTIVE' | 'BREAKDOWN' | 'INACTIVE')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
                         <option value="ACTIVE">Active (Available)</option>
