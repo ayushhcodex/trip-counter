@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, ensureDieselTable } from '@/db';
 import { dieselEntries, vehicles, users, notifications, adminVehicleAssignments } from '@/db/schema';
 import { eq, and, desc, gte, lte, inArray } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
+    await ensureDieselTable();
     const url = new URL(req.url);
     const driverId = url.searchParams.get('driverId');
     const vehicleId = url.searchParams.get('vehicleId');
@@ -138,6 +139,7 @@ export async function POST(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
+    await ensureDieselTable();
     const body = await req.json().catch(() => ({}));
     const { driverId, vehicleId, date, litres, notes, id: entryId } = body;
 
@@ -292,6 +294,7 @@ export async function DELETE(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
+    await ensureDieselTable();
     const body = await req.json().catch(() => ({}));
     const { id } = body;
 

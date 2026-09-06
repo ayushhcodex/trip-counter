@@ -30,21 +30,44 @@ export default function DriverDieselPage() {
   });
   const [unreadNotifications, setUnreadNotifications] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [userRole, setUserRole] = useState<string>('DRIVER');
+  const [userName, setUserName] = useState<string>('');
 
   const loadDieselData = async () => {
+    setLoading(true);
+    setErrorMsg('');
     try {
-      const res = await fetch('/api/driver/diesel');
-      if (!res.ok) {
+      // 1. Check user profile
+      const meRes = await fetch('/api/auth/me');
+      if (meRes.status === 401) {
+        // Only redirect to login if session token is actually missing / expired
         router.push('/login');
         return;
       }
-      const data = await res.json();
-      if (data.success) {
-        setEntries(data.entries || []);
-        setMetrics(data.metrics || { totalLitres: 0, todayLitres: 0, monthLitres: 0 });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        if (meData.user) {
+          setUserRole(meData.user.role || 'DRIVER');
+          setUserName(meData.user.name || '');
+        }
       }
 
-      // Check unread notifications
+      // 2. Fetch diesel data
+      const res = await fetch('/api/driver/diesel');
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEntries(data.entries || []);
+        setMetrics(data.metrics || { totalLitres: 0, todayLitres: 0, monthLitres: 0 });
+      } else {
+        setErrorMsg(data.error || 'Unable to retrieve diesel records.');
+      }
+
+      // 3. Check notifications (for drivers)
       const notifRes = await fetch('/api/notifications');
       if (notifRes.ok) {
         const notifData = await notifRes.json();
@@ -53,7 +76,7 @@ export default function DriverDieselPage() {
       }
     } catch (error) {
       console.error('Failed to load diesel logs:', error);
-      setErrorMsg('Failed to load diesel log records.');
+      setErrorMsg('Network error while loading diesel records.');
     } finally {
       setLoading(false);
     }
@@ -68,30 +91,69 @@ export default function DriverDieselPage() {
     router.push('/login');
   };
 
+  const getBackRoute = () => {
+    if (userRole === 'SUPER_ADMIN') return '/superadmin';
+    if (userRole === 'ADMIN') return '/admin';
+    return '/driver';
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50 text-slate-800">
       {/* Header */}
       <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-md">
-        <div>
-          <h1 className="font-extrabold text-xl tracking-tight text-blue-400">TripCounter</h1>
-          <p className="text-xs text-slate-400 font-semibold">Driver Portal • Diesel Records</p>
+        <div className="flex items-center space-x-3">
+          {userRole !== 'DRIVER' && (
+            <button
+              onClick={() => router.push(getBackRoute())}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-md font-bold transition-all"
+            >
+              ← Back
+            </button>
+          )}
+          <div>
+            <h1 className="font-extrabold text-xl tracking-tight text-blue-400">TripCounter</h1>
+            <p className="text-xs text-slate-400 font-semibold">
+              {userRole === 'SUPER_ADMIN'
+                ? 'SuperAdmin Portal • Fuel & Diesel Ledger'
+                : userRole === 'ADMIN'
+                ? 'Admin Operations • Fuel & Diesel Ledger'
+                : 'Driver Portal • Diesel Records'}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
-        >
-          Logout
-        </button>
+        <div className="flex items-center space-x-2">
+          {userName && (
+            <span className="hidden sm:inline text-xs text-slate-400 font-medium mr-2">
+              {userName}
+            </span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 max-w-lg mx-auto w-full flex flex-col">
-        <h2 className="text-xl font-black text-slate-800 tracking-tight mb-4">
-          Fuel & Diesel Log
-        </h2>
+      <main className="flex-1 p-6 max-w-2xl mx-auto w-full flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            Fuel & Diesel Log
+          </h2>
+          {userRole !== 'DRIVER' && (
+            <button
+              onClick={() => router.push(getBackRoute())}
+              className="text-xs bg-blue-900 hover:bg-blue-800 text-white px-3 py-1.5 rounded-lg font-bold shadow-sm transition-all"
+            >
+              Manage Vehicles →
+            </button>
+          )}
+        </div>
 
         {errorMsg && (
-          <div className="w-full bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-md text-xs mb-4 font-semibold text-center">
+          <div className="w-full bg-amber-50 border border-amber-300 text-amber-800 px-4 py-2.5 rounded-md text-xs mb-4 font-semibold text-center">
             {errorMsg}
           </div>
         )}
@@ -122,9 +184,17 @@ export default function DriverDieselPage() {
 
         {/* Diesel Entries List */}
         <div className="flex-1 flex flex-col">
-          <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-3 text-left">
-            Logged Fuel Fillings
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400 text-left">
+              Logged Fuel Fillings
+            </h3>
+            <button
+              onClick={() => loadDieselData()}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              ↻ Refresh
+            </button>
+          </div>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -152,7 +222,7 @@ export default function DriverDieselPage() {
                       })}
                     </span>
                     <span className="bg-blue-100 text-blue-900 text-xs px-2.5 py-1 rounded-full font-black">
-                      {parseFloat(entry.litres).toFixed(2)} Litres
+                      {parseFloat(entry.litres || '0').toFixed(2)} Litres
                     </span>
                   </div>
 
@@ -160,7 +230,7 @@ export default function DriverDieselPage() {
                     <span>
                       Vehicle: <strong className="uppercase text-slate-700">{entry.vehicleNumber || 'Unassigned'}</strong>
                     </span>
-                    <span>By Admin: {entry.adminName}</span>
+                    <span>Recorded by: {entry.adminName}</span>
                   </div>
 
                   {entry.notes && (
@@ -175,22 +245,24 @@ export default function DriverDieselPage() {
         </div>
       </main>
 
-      {/* Driver Footer Navigation */}
+      {/* Bottom Footer Navigation */}
       <footer className="bg-white border-t border-slate-200 flex justify-around py-2.5 sticky bottom-0 z-10">
         <button
-          onClick={() => router.push('/driver')}
+          onClick={() => router.push(getBackRoute())}
           className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">📊</span>
           <span>Dashboard</span>
         </button>
-        <button
-          onClick={() => router.push('/driver/history')}
-          className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
-        >
-          <span className="text-lg">📅</span>
-          <span>My Trips</span>
-        </button>
+        {userRole === 'DRIVER' && (
+          <button
+            onClick={() => router.push('/driver/history')}
+            className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
+          >
+            <span className="text-lg">📅</span>
+            <span>My Trips</span>
+          </button>
+        )}
         <button
           onClick={() => loadDieselData()}
           className="flex flex-col items-center text-blue-900 font-bold text-xs"
@@ -198,16 +270,18 @@ export default function DriverDieselPage() {
           <span className="text-lg">⛽</span>
           <span>Diesel</span>
         </button>
-        <button
-          onClick={() => router.push('/driver/notifications')}
-          className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold relative"
-        >
-          {unreadNotifications && (
-            <span className="absolute top-0.5 right-4 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>
-          )}
-          <span className="text-lg">🔔</span>
-          <span>Notifications</span>
-        </button>
+        {userRole === 'DRIVER' && (
+          <button
+            onClick={() => router.push('/driver/notifications')}
+            className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold relative"
+          >
+            {unreadNotifications && (
+              <span className="absolute top-0.5 right-4 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>
+            )}
+            <span className="text-lg">🔔</span>
+            <span>Notifications</span>
+          </button>
+        )}
       </footer>
     </div>
   );
