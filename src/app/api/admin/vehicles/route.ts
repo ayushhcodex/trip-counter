@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { vehicles, adminVehicleAssignments, vehicleDriverAssignments, users, trips, tripAdjustments, dailyVehicleVerifications } from '@/db/schema';
-import { eq, and, gte, lte, isNull, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, isNull, sql, inArray } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
 import { getDateBoundaries, getLocalDateString } from '@/lib/timezone';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const { user: actor, errorResponse } = await checkAuth(['ADMIN', 'SUPER_ADMIN']);
@@ -50,7 +53,15 @@ export async function GET(req: NextRequest) {
     // 2. Fetch accessible vehicles for the actor
     let targetVehicles;
     if (actor!.role === 'SUPER_ADMIN') {
-      targetVehicles = await db.select().from(vehicles);
+      targetVehicles = await db
+        .select({
+          id: vehicles.id,
+          vehicleNumber: vehicles.vehicleNumber,
+          status: vehicles.status,
+          createdAt: vehicles.createdAt,
+          updatedAt: vehicles.updatedAt,
+        })
+        .from(vehicles);
     } else {
       targetVehicles = await db
         .select({
@@ -65,13 +76,31 @@ export async function GET(req: NextRequest) {
         .where(eq(adminVehicleAssignments.adminId, actor!.userId));
     }
 
-    const vehicleStats = [];
+    if (!targetVehicles || targetVehicles.length === 0) {
+      return NextResponse.json({
+        success: true,
+        dateRange: { start: startStr, end: endStr },
+        vehicles: [],
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      });
+    }
 
-    // 3. Populate statistics for each vehicle
-    for (const vehicle of targetVehicles) {
-      // A. Get active drivers currently assigned to this vehicle
-      const activeAssignments = await db
+    const vehicleIds = targetVehicles.map((v) => v.id);
+
+    // 3. Parallel batch fetching for all target vehicles
+    const [
+      activeAssignments,
+      tripsGrouped,
+      adjustmentsGrouped,
+      verificationsList,
+    ] = await Promise.all([
+      // A. Active driver assignments
+      db
         .select({
+          vehicleId: vehicleDriverAssignments.vehicleId,
           slot: vehicleDriverAssignments.slot,
           driverId: users.id,
           driverName: users.name,
@@ -80,112 +109,125 @@ export async function GET(req: NextRequest) {
         .innerJoin(users, eq(vehicleDriverAssignments.driverId, users.id))
         .where(
           and(
-            eq(vehicleDriverAssignments.vehicleId, vehicle.id),
+            inArray(vehicleDriverAssignments.vehicleId, vehicleIds),
             isNull(vehicleDriverAssignments.endAt)
           )
-        );
+        ),
 
-      const driver1 = activeAssignments.find((a) => a.slot === 1);
-      const driver2 = activeAssignments.find((a) => a.slot === 2);
-
-      // B. Count reported trips in range
-      const [tripsResult] = await db
-        .select({ count: sql<number>`count(*)::int` })
+      // B. Trips count grouped by vehicleId and driverId
+      db
+        .select({
+          vehicleId: trips.vehicleId,
+          driverId: trips.driverId,
+          count: sql<number>`count(*)::int`,
+        })
         .from(trips)
         .where(
           and(
-            eq(trips.vehicleId, vehicle.id),
+            inArray(trips.vehicleId, vehicleIds),
             gte(trips.completedAt, startUTC),
             lte(trips.completedAt, endUTC)
           )
-        );
-      const reportedCount = tripsResult?.count || 0;
+        )
+        .groupBy(trips.vehicleId, trips.driverId),
 
-      // C. Count reported trips split by driver for additional dashboard breakdown
-      const driver1Trips = driver1
-        ? (await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(trips)
-            .where(
-              and(
-                eq(trips.vehicleId, vehicle.id),
-                eq(trips.driverId, driver1.driverId),
-                gte(trips.completedAt, startUTC),
-                lte(trips.completedAt, endUTC)
-              )
-            ))[0]?.count || 0
-        : 0;
-
-      const driver2Trips = driver2
-        ? (await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(trips)
-            .where(
-              and(
-                eq(trips.vehicleId, vehicle.id),
-                eq(trips.driverId, driver2.driverId),
-                gte(trips.completedAt, startUTC),
-                lte(trips.completedAt, endUTC)
-              )
-            ))[0]?.count || 0
-        : 0;
-
-      // D. Sum adjustments in range
-      // For a single day, adjustments can be matched by YYYY-MM-DD
-      // For a multi-day range, we must filter between dates
-      let adjustmentSum = 0;
-      if (startStr === endStr) {
-        // Single day optimization
-        const [adjResult] = await db
-          .select({ sum: sql<number>`sum(adjustment)::int` })
-          .from(tripAdjustments)
-          .where(
-            and(
-              eq(tripAdjustments.vehicleId, vehicle.id),
-              eq(tripAdjustments.date, startStr)
-            )
-          );
-        adjustmentSum = adjResult?.sum || 0;
-      } else {
-        // Date range
-        const [adjResult] = await db
-          .select({ sum: sql<number>`sum(adjustment)::int` })
-          .from(tripAdjustments)
-          .where(
-            and(
-              eq(tripAdjustments.vehicleId, vehicle.id),
-              gte(tripAdjustments.date, startStr),
-              lte(tripAdjustments.date, endStr)
-            )
-          );
-        adjustmentSum = adjResult?.sum || 0;
-      }
-
-      // E. Check daily verification status (applicable mostly for single-day views)
-      let verificationStatus = 'UNVERIFIED';
-      let verifiedBy = null;
-      let verifiedAt = null;
-
-      if (startStr === endStr) {
-        const [verif] = await db
-          .select()
-          .from(dailyVehicleVerifications)
-          .where(
-            and(
-              eq(dailyVehicleVerifications.vehicleId, vehicle.id),
-              eq(dailyVehicleVerifications.date, startStr)
-            )
+      // C. Adjustments sum grouped by vehicleId
+      db
+        .select({
+          vehicleId: tripAdjustments.vehicleId,
+          sum: sql<number>`coalesce(sum(${tripAdjustments.adjustment}), 0)::int`,
+        })
+        .from(tripAdjustments)
+        .where(
+          and(
+            inArray(tripAdjustments.vehicleId, vehicleIds),
+            startStr === endStr
+              ? eq(tripAdjustments.date, startStr)
+              : and(gte(tripAdjustments.date, startStr), lte(tripAdjustments.date, endStr))
           )
-          .limit(1);
+        )
+        .groupBy(tripAdjustments.vehicleId),
 
-        if (verif) {
-          verificationStatus = verif.status;
-          verifiedBy = verif.verifiedBy;
-          verifiedAt = verif.verifiedAt;
-        }
+      // D. Verifications list (for single-day view)
+      startStr === endStr
+        ? db
+            .select({
+              vehicleId: dailyVehicleVerifications.vehicleId,
+              status: dailyVehicleVerifications.status,
+              verifiedBy: dailyVehicleVerifications.verifiedBy,
+              verifiedAt: dailyVehicleVerifications.verifiedAt,
+            })
+            .from(dailyVehicleVerifications)
+            .where(
+              and(
+                inArray(dailyVehicleVerifications.vehicleId, vehicleIds),
+                eq(dailyVehicleVerifications.date, startStr)
+              )
+            )
+        : Promise.resolve([]),
+    ]);
+
+    // Map active assignments by vehicleId
+    const assignmentsByVehicle = new Map<
+      string,
+      {
+        driver1: { id: string; name: string } | null;
+        driver2: { id: string; name: string } | null;
       }
+    >();
+    for (const a of activeAssignments) {
+      let entry = assignmentsByVehicle.get(a.vehicleId);
+      if (!entry) {
+        entry = { driver1: null, driver2: null };
+        assignmentsByVehicle.set(a.vehicleId, entry);
+      }
+      if (a.slot === 1) {
+        entry.driver1 = { id: a.driverId, name: a.driverName };
+      } else if (a.slot === 2) {
+        entry.driver2 = { id: a.driverId, name: a.driverName };
+      }
+    }
 
-      vehicleStats.push({
+    // Map total trips per vehicle and trips per driver
+    const vehicleTotalTrips = new Map<string, number>();
+    const driverTripsMap = new Map<string, number>();
+    for (const row of tripsGrouped) {
+      const count = Number(row.count) || 0;
+      const currentTotal = vehicleTotalTrips.get(row.vehicleId) || 0;
+      vehicleTotalTrips.set(row.vehicleId, currentTotal + count);
+      driverTripsMap.set(`${row.vehicleId}:${row.driverId}`, count);
+    }
+
+    // Map adjustments by vehicleId
+    const adjustmentsByVehicle = new Map<string, number>();
+    for (const row of adjustmentsGrouped) {
+      adjustmentsByVehicle.set(row.vehicleId, Number(row.sum) || 0);
+    }
+
+    // Map verifications by vehicleId
+    const verificationsByVehicle = new Map<string, (typeof verificationsList)[number]>();
+    for (const v of verificationsList) {
+      verificationsByVehicle.set(v.vehicleId, v);
+    }
+
+    // 4. Populate statistics for each vehicle
+    const vehicleStats = targetVehicles.map((vehicle) => {
+      const assigned = assignmentsByVehicle.get(vehicle.id);
+      const driver1 = assigned?.driver1 || null;
+      const driver2 = assigned?.driver2 || null;
+
+      const reportedCount = vehicleTotalTrips.get(vehicle.id) || 0;
+      const driver1Trips = driver1 ? (driverTripsMap.get(`${vehicle.id}:${driver1.id}`) || 0) : 0;
+      const driver2Trips = driver2 ? (driverTripsMap.get(`${vehicle.id}:${driver2.id}`) || 0) : 0;
+
+      const adjustmentSum = adjustmentsByVehicle.get(vehicle.id) || 0;
+      const verif = verificationsByVehicle.get(vehicle.id);
+
+      const verificationStatus = verif ? verif.status : 'UNVERIFIED';
+      const verifiedBy = verif ? verif.verifiedBy : null;
+      const verifiedAt = verif ? verif.verifiedAt : null;
+
+      return {
         id: vehicle.id,
         vehicleNumber: vehicle.vehicleNumber,
         status: vehicle.status,
@@ -195,15 +237,19 @@ export async function GET(req: NextRequest) {
         verificationStatus,
         verifiedBy,
         verifiedAt,
-        driver1: driver1 ? { id: driver1.driverId, name: driver1.driverName, reportedCount: driver1Trips } : null,
-        driver2: driver2 ? { id: driver2.driverId, name: driver2.driverName, reportedCount: driver2Trips } : null,
-      });
-    }
+        driver1: driver1 ? { id: driver1.id, name: driver1.name, reportedCount: driver1Trips } : null,
+        driver2: driver2 ? { id: driver2.id, name: driver2.name, reportedCount: driver2Trips } : null,
+      };
+    });
 
     return NextResponse.json({
       success: true,
       dateRange: { start: startStr, end: endStr },
       vehicles: vehicleStats,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
     });
   } catch (error) {
     console.error('[ADMIN_VEHICLES_STATS_ERROR]', error);

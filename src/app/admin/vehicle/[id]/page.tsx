@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getLocalDateString } from '@/lib/timezone';
 
@@ -36,6 +36,8 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
   const { id: vehicleId } = use(props.params);
 
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
   const [adjustments, setAdjustments] = useState<AdjustmentItem[]>([]);
   const [dieselLogs, setDieselLogs] = useState<any[]>([]);
@@ -58,14 +60,21 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
   const [dieselNotes, setDieselNotes] = useState('');
   const [submittingDiesel, setSubmittingDiesel] = useState(false);
 
-  const loadVehicleDetails = async () => {
-    setLoading(true);
+  const loadVehicleDetails = useCallback(async (isSilent = false, dateOverride?: string) => {
+    if (isSilent) {
+      setIsRefreshing(true);
+    }
+    const targetDate = dateOverride || selectedDate;
     try {
+      const now = Date.now();
       // Fetch stats for this vehicle on the selected date
-      const statsRes = await fetch(`/api/admin/vehicles?range=custom&startDate=${selectedDate}&endDate=${selectedDate}`);
+      const statsRes = await fetch(
+        `/api/admin/vehicles?range=custom&startDate=${targetDate}&endDate=${targetDate}&_t=${now}`,
+        { cache: 'no-store' }
+      );
       if (statsRes.ok) {
         const data = await statsRes.json();
-        const found = data.vehicles.find((v: any) => v.id === vehicleId);
+        const found = (data.vehicles || []).find((v: any) => v.id === vehicleId);
         if (found) {
           setVehicle(found);
           // Set default driver selection to driver 1 if available
@@ -82,29 +91,64 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
       }
 
       // Fetch adjustments for this vehicle on this date
-      const adjRes = await fetch(`/api/admin/adjustments?vehicleId=${vehicleId}&date=${selectedDate}`);
+      const adjRes = await fetch(`/api/admin/adjustments?vehicleId=${vehicleId}&date=${targetDate}&_t=${now}`, {
+        cache: 'no-store',
+      });
       if (adjRes.ok) {
         const adjData = await adjRes.json();
         setAdjustments(adjData.adjustments || []);
       }
 
       // Fetch diesel logs for this vehicle on this date
-      const dieselRes = await fetch(`/api/admin/diesel?vehicleId=${vehicleId}&date=${selectedDate}`);
+      const dieselRes = await fetch(`/api/admin/diesel?vehicleId=${vehicleId}&date=${targetDate}&_t=${now}`, {
+        cache: 'no-store',
+      });
       if (dieselRes.ok) {
         const dieselData = await dieselRes.json();
         setDieselLogs(dieselData.entries || []);
       }
+
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load vehicle details:', error);
       setErrorMsg('Failed to retrieve vehicle details.');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, [selectedDate, vehicleId, targetDriverId]);
 
   useEffect(() => {
-    loadVehicleDetails();
-  }, [selectedDate]);
+    let active = true;
+
+    const run = async () => {
+      if (active) {
+        await loadVehicleDetails(false);
+      }
+    };
+    run();
+
+    // Periodic polling for live vehicle details
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadVehicleDetails(true);
+      }
+    }, 5000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadVehicleDetails(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadVehicleDetails]);
 
   // Handle trip count verification
   const handleVerify = async () => {
@@ -250,8 +294,8 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
           />
         </div>
         
-        {vehicle && (
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
+          {vehicle && (
             <span
               className={`px-3 py-1 rounded text-xs font-black uppercase ${
                 vehicle.verificationStatus === 'VERIFIED'
@@ -261,8 +305,44 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
             >
               Status: {vehicle.verificationStatus}
             </span>
+          )}
+
+          <div className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Live</span>
           </div>
-        )}
+
+          {lastUpdated && (
+            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+
+          <button
+            onClick={() => loadVehicleDetails(true)}
+            disabled={isRefreshing || loading}
+            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
+            title="Refresh details now"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </button>
+        </div>
       </section>
 
       {/* Main Container */}

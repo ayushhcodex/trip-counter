@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface VehicleStat {
@@ -18,6 +18,8 @@ interface VehicleStat {
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [adminName, setAdminName] = useState('');
   const [vehicles, setVehicles] = useState<VehicleStat[]>([]);
   const [range, setRange] = useState('today'); // today, yesterday, week, month, custom
@@ -25,41 +27,89 @@ export default function AdminDashboard() {
   const [endDate, setEndDate] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const loadData = async () => {
-    setLoading(true);
+  const fetchStats = useCallback(async (currentRange: string, silent = false, customStart = '', customEnd = '') => {
+    if (silent) {
+      setIsRefreshing(true);
+    }
     try {
-      // Get profile
-      const profRes = await fetch('/api/auth/me');
-      if (!profRes.ok) {
-        router.push('/login');
-        return;
+      let url = `/api/admin/vehicles?range=${currentRange}&_t=${Date.now()}`;
+      if (currentRange === 'custom') {
+        url += `&startDate=${customStart}&endDate=${customEnd}`;
       }
-      const profData = await profRes.json();
-      setAdminName(profData.user.name);
-
-      // Get vehicles stats
-      let url = `/api/admin/vehicles?range=${range}`;
-      if (range === 'custom') {
-        url += `&startDate=${startDate}&endDate=${endDate}`;
-      }
-      const statsRes = await fetch(url);
+      const statsRes = await fetch(url, { cache: 'no-store' });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
-        setVehicles(statsData.vehicles);
+        setVehicles(statsData.vehicles || []);
+        setErrorMsg('');
+        setLastUpdated(new Date());
+      } else {
+        const errData = await statsRes.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Failed to fetch vehicle dashboard statistics.');
       }
     } catch (error) {
       console.error('Failed to load admin stats:', error);
       setErrorMsg('Failed to fetch vehicle dashboard statistics.');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const handleRangeSelect = (newRange: string) => {
+    if (newRange === range) return;
+    setRange(newRange);
+    if (newRange !== 'custom') {
+      setLoading(true);
+      fetchStats(newRange, false);
     }
   };
 
+  // Initial load and live polling
   useEffect(() => {
-    if (range !== 'custom') {
-      loadData();
-    }
-  }, [range]);
+    let active = true;
+
+    const init = async () => {
+      try {
+        const profRes = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (!profRes.ok) {
+          router.push('/login');
+          return;
+        }
+        const profData = await profRes.json();
+        if (!active) return;
+        setAdminName(profData.user?.name || 'Admin');
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+
+      if (active && range !== 'custom') {
+        await fetchStats(range, false);
+      }
+    };
+
+    init();
+
+    // Live polling every 5 seconds
+    const interval = setInterval(() => {
+      if (range !== 'custom' && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchStats(range, true);
+      }
+    }, 5000);
+
+    const handleVisibilityChange = () => {
+      if (range !== 'custom' && document.visibilityState === 'visible') {
+        fetchStats(range, true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [range, router, fetchStats]);
 
   const handleCustomRangeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +117,16 @@ export default function AdminDashboard() {
       setErrorMsg('Please specify both Start Date and End Date.');
       return;
     }
-    loadData();
+    setLoading(true);
+    fetchStats('custom', false, startDate, endDate);
+  };
+
+  const handleManualRefresh = () => {
+    if (range === 'custom') {
+      fetchStats('custom', true, startDate, endDate);
+    } else {
+      fetchStats(range, true);
+    }
   };
 
   const handleLogout = async () => {
@@ -83,12 +142,14 @@ export default function AdminDashboard() {
           <h1 className="font-extrabold text-xl tracking-tight text-blue-400">TripCounter</h1>
           <p className="text-xs text-slate-400 font-semibold">Admin Panel • Hello, {adminName}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
-        >
-          Logout
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleLogout}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       {/* Toolbar / Filters */}
@@ -98,7 +159,7 @@ export default function AdminDashboard() {
             {['today', 'yesterday', 'week', 'month', 'custom'].map((r) => (
               <button
                 key={r}
-                onClick={() => setRange(r)}
+                onClick={() => handleRangeSelect(r)}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${
                   range === r
                     ? 'bg-blue-900 text-white shadow-sm'
@@ -108,6 +169,45 @@ export default function AdminDashboard() {
                 {r}
               </button>
             ))}
+          </div>
+
+          {/* Live Status & Refresh */}
+          <div className="flex items-center space-x-2.5">
+            {range !== 'custom' && (
+              <div className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Live</span>
+              </div>
+            )}
+            {lastUpdated && (
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing || loading}
+              className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-all disabled:opacity-50"
+              title="Refresh vehicle stats now"
+            >
+              <svg
+                className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+            </button>
           </div>
         </div>
 
