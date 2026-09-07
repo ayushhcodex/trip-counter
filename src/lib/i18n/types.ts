@@ -1,0 +1,202 @@
+export type Language = 'en' | 'hi' | 'gu';
+
+export interface LanguageOption {
+  code: Language;
+  label: string;
+  nativeLabel: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: 'en', label: 'English', nativeLabel: 'English' },
+  { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी' },
+  { code: 'gu', label: 'Gujarati', nativeLabel: 'ગુજરાતી' },
+];
+
+export interface TranslationDictionary {
+  common: {
+    appName: string;
+    tagline: string;
+    loading: string;
+    error: string;
+    networkError: string;
+    save: string;
+    cancel: string;
+    back: string;
+    edit: string;
+    delete: string;
+    remove: string;
+    refresh: string;
+    logout: string;
+    status: string;
+    active: string;
+    inactive: string;
+    leave: string;
+    breakdown: string;
+    verified: string;
+    unverified: string;
+    online: string;
+    offline: string;
+    syncing: string;
+    allSynced: string;
+    dayShift: string;
+    nightShift: string;
+    slot1: string;
+    slot2: string;
+    driverRole: string;
+    adminRole: string;
+    superAdminRole: string;
+    today: string;
+    yesterday: string;
+    thisWeek: string;
+    thisMonth: string;
+    total: string;
+    date: string;
+    actions: string;
+    manageVehicles: string;
+  };
+  auth: {
+    title: string;
+    subtitle: string;
+    usernameLabel: string;
+    usernamePlaceholder: string;
+    passwordLabel: string;
+    passwordPlaceholder: string;
+    signInBtn: string;
+    signingIn: string;
+    invalidCredentials: string;
+    accountDeactivated: string;
+    driverIdHint: string;
+    rolesHint: string;
+  };
+  nav: {
+    dashboard: string;
+    myTrips: string;
+    diesel: string;
+    notifications: string;
+    vehicles: string;
+    users: string;
+    assignments: string;
+    auditLogs: string;
+  };
+  driver: {
+    portalTitle: string;
+    assignedVehicle: string;
+    noVehicleAssigned: string;
+    contactAdmin: string;
+    currentShift: string;
+    completeTripBtn: string;
+    confirmTripPrompt: string;
+    submittingTrip: string;
+    tripSuccess: string;
+    todaysTrips: string;
+    noTripsLogged: string;
+    tripNumber: string;
+    offlineModeNotice: string;
+    queuedTripsCount: string;
+    historyTitle: string;
+    historicalLogs: string;
+    noHistoryFound: string;
+    reportedTrips: string;
+    adjustmentsTotal: string;
+    verifiedTrips: string;
+    tripCompletedAt: string;
+    adminAdjustments: string;
+    acknowledgeBtn: string;
+    acknowledgedStatus: string;
+    adjustmentsNotice: string;
+    notificationsTitle: string;
+    markAllRead: string;
+    noNotifications: string;
+  };
+  admin: {
+    portalTitle: string;
+    fleetTitle: string;
+    fleetSummary: string;
+    activeVehicles: string;
+    totalTripsToday: string;
+    verifiedTripsToday: string;
+    pendingVerification: string;
+    assignedToMe: string;
+    allVehicles: string;
+    vehicleDetails: string;
+    dailyVerificationSummary: string;
+    driverReportedCount: string;
+    finalVerifiedCount: string;
+    driverSubmissions: string;
+    ensureCountsMatch: string;
+    verifyCountBtn: string;
+    verifying: string;
+    verifiedBadge: string;
+    unverifiedBadge: string;
+    adjustTripCount: string;
+    targetDriver: string;
+    adjustmentType: string;
+    addTrips: string;
+    removeTrips: string;
+    quantity: string;
+    reasonLabel: string;
+    reasonPlaceholder: string;
+    applyAdjustmentBtn: string;
+    adjusting: string;
+    adjustmentsLog: string;
+    noAdjustmentsDate: string;
+    affectedDriver: string;
+    byAdmin: string;
+  };
+  superadmin: {
+    consoleTitle: string;
+    consoleSubtitle: string;
+    allVehicles: string;
+    vehicleNumber: string;
+    editVehicleStatus: string;
+    addVehicle: string;
+    vehicleRegNumber: string;
+    breakdownStatus: string;
+    saveVehicle: string;
+    allUsers: string;
+    registerUser: string;
+    editUserProfile: string;
+    fullName: string;
+    driverIdOrUsername: string;
+    phoneNumber: string;
+    systemRole: string;
+    availabilityStatus: string;
+    passwordLeaveBlank: string;
+    saveUser: string;
+    driverAssignments: string;
+    assignDriverSlot: string;
+    targetVehicle: string;
+    driver: string;
+    vehicleSlot: string;
+    unassignSlot: string;
+    updateAssignment: string;
+    adminMappings: string;
+    mapAdminVehicle: string;
+    adminUser: string;
+    mapVehicleBtn: string;
+    systemAuditTrail: string;
+    actor: string;
+    entity: string;
+  };
+  diesel: {
+    pageTitle: string;
+    ledgerTitle: string;
+    loggedFuelFillings: string;
+    noDieselEntries: string;
+    litres: string;
+    recordedBy: string;
+    vehicleLabel: string;
+    notesLabel: string;
+  };
+  pwa: {
+    installTitle: string;
+    installSubtitle: string;
+    iosInstructionsTitle: string;
+    iosStep1: string;
+    iosStep2: string;
+    androidDescription: string;
+    installAppBtn: string;
+    gotItBtn: string;
+    maybeLaterBtn: string;
+  };
+}

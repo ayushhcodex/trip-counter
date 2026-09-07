@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getLocalDateString } from '@/lib/timezone';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface DriverInfo {
   id: string;
@@ -34,6 +36,7 @@ interface AdjustmentItem {
 export default function VehicleDetailPage(props: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id: vehicleId } = use(props.params);
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -272,20 +275,24 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
         <div className="flex items-center space-x-3">
           <button
             onClick={() => router.push('/admin')}
-            className="text-slate-300 hover:text-white text-sm font-bold focus:outline-none"
+            className="text-slate-300 hover:text-white text-sm font-bold focus:outline-none flex items-center space-x-1"
           >
-            ← Dashboard
+            <span>←</span>
+            <span>{t('nav.dashboard')}</span>
           </button>
           <h1 className="font-extrabold text-lg tracking-tight uppercase">
-            {vehicle ? vehicle.vehicleNumber : 'Vehicle Details'}
+            {vehicle ? vehicle.vehicleNumber : t('admin.vehicleDetails')}
           </h1>
+        </div>
+        <div className="flex items-center space-x-3">
+          <LanguageSelector variant="header" />
         </div>
       </header>
 
       {/* Date selector toolbar */}
       <section className="bg-white border-b border-slate-200 px-6 py-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <span className="text-xs uppercase font-black text-slate-400">Target Date:</span>
+          <span className="text-xs uppercase font-black text-slate-400">{t('common.date')}:</span>
           <input
             type="date"
             value={selectedDate}
@@ -303,7 +310,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                   : 'bg-red-100 text-red-700'
               }`}
             >
-              Status: {vehicle.verificationStatus}
+              {t('common.status')}: {vehicle.verificationStatus === 'VERIFIED' ? t('common.verified') : t('common.unverified')}
             </span>
           )}
 
@@ -312,12 +319,12 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>Live</span>
+            <span>{t('common.online')}</span>
           </div>
 
           {lastUpdated && (
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-              Updated {lastUpdated.toLocaleTimeString()}
+              {lastUpdated.toLocaleTimeString()}
             </span>
           )}
 
@@ -340,7 +347,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+            <span>{isRefreshing ? t('common.syncing') : t('common.refresh')}</span>
           </button>
         </div>
       </section>
@@ -362,11 +369,11 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
         {loading ? (
           <div className="md:col-span-3 flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
             <div className="w-8 h-8 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-3 text-slate-500 text-xs font-semibold">Loading data...</p>
+            <p className="mt-3 text-slate-500 text-xs font-semibold">{t('common.loading')}</p>
           </div>
         ) : !vehicle ? (
           <div className="md:col-span-3 text-center py-12 text-slate-400 text-xs font-semibold">
-            Vehicle info not found.
+            {t('driver.noVehicleAssigned')}
           </div>
         ) : (
           <>
@@ -375,16 +382,16 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               {/* Daily Stats Card */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
-                  Daily Verification Summary
+                  {t('admin.dailyVerificationSummary')}
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 text-center">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Driver Reported</span>
+                    <span className="text-xs font-semibold text-slate-400 uppercase">{t('admin.driverReportedCount')}</span>
                     <span className="text-4xl font-black text-slate-800 block mt-2">{vehicle.reportedCount}</span>
                   </div>
                   <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 text-center">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Final Verified</span>
+                    <span className="text-xs font-semibold text-slate-400 uppercase">{t('admin.finalVerifiedCount')}</span>
                     <span className="text-4xl font-black text-blue-900 block mt-2">{vehicle.verifiedCount}</span>
                   </div>
                 </div>
@@ -392,16 +399,16 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                 {/* Driver contributions */}
                 <div className="space-y-3.5 border-t border-slate-100 pt-5">
                   <h4 className="text-xs uppercase font-bold tracking-wider text-slate-400">
-                    Individual Driver Submissions
+                    {t('admin.driverSubmissions')}
                   </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
-                      <span className="font-bold text-slate-700">Slot 1: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
-                      <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} trips</span>
+                      <span className="font-bold text-slate-700">{t('common.slot1')}: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
+                      <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} {t('driver.reportedTrips').toLowerCase()}</span>
                     </div>
                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
-                      <span className="font-bold text-slate-700">Slot 2: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
-                      <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} trips</span>
+                      <span className="font-bold text-slate-700">{t('common.slot2')}: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
+                      <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} {t('driver.reportedTrips').toLowerCase()}</span>
                     </div>
                   </div>
                 </div>
@@ -409,7 +416,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                 {/* Verification Control */}
                 <div className="border-t border-slate-100 pt-5 flex items-center justify-between">
                   <span className="text-xs text-slate-500 font-semibold">
-                    Ensure counts match before verifying.
+                    {t('admin.ensureCountsMatch')}
                   </span>
                   <button
                     disabled={vehicle.verificationStatus === 'VERIFIED' || submittingVerify}
@@ -420,7 +427,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                         : 'bg-blue-900 hover:bg-blue-800 text-white hover:shadow-lg'
                     }`}
                   >
-                    {submittingVerify ? 'Verifying...' : vehicle.verificationStatus === 'VERIFIED' ? 'Verified' : 'Verify Count'}
+                    {submittingVerify ? t('admin.verifying') : vehicle.verificationStatus === 'VERIFIED' ? t('common.verified') : t('admin.verifyCountBtn')}
                   </button>
                 </div>
               </div>
@@ -428,11 +435,11 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               {/* Adjustments History */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
-                  Adjustment logs
+                  {t('admin.adjustmentsLog')}
                 </h3>
                 {adjustments.length === 0 ? (
                   <p className="text-center text-xs text-slate-400 py-4 font-semibold">
-                    No adjustments applied on this date.
+                    {t('admin.noAdjustmentsDate')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -442,7 +449,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                           ? vehicle.driver1.name
                           : vehicle.driver2 && vehicle.driver2.id === adj.driverId
                           ? vehicle.driver2.name
-                          : 'Driver';
+                          : t('common.driverRole');
 
                       return (
                         <div
@@ -457,17 +464,17 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                                   : 'bg-red-100 text-red-700'
                               }`}
                             >
-                              {adj.adjustment > 0 ? `+${adj.adjustment}` : adj.adjustment} trips
+                              {adj.adjustment > 0 ? `+${adj.adjustment}` : adj.adjustment} {t('driver.reportedTrips').toLowerCase()}
                             </span>
                             <span className="text-slate-400 text-[10px]">
-                              By {adj.adminName}
+                              {t('admin.byAdmin')} {adj.adminName}
                             </span>
                           </div>
                           <p className="text-slate-600 bg-white p-2.5 rounded border border-slate-200 italic">
                             "{adj.reason}"
                           </p>
                           <p className="text-[10px] text-slate-400 font-semibold">
-                            Affected Driver: {driverName}
+                            {t('admin.affectedDriver')}: {driverName}
                           </p>
                         </div>
                       );
@@ -479,11 +486,11 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               {/* Diesel Fillings History */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
-                  Diesel logs (Fuel)
+                  {t('diesel.ledgerTitle')}
                 </h3>
                 {dieselLogs.length === 0 ? (
                   <p className="text-center text-xs text-slate-400 py-4 font-semibold">
-                    No diesel entries logged on this date.
+                    {t('diesel.noDieselEntries')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -494,14 +501,14 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                       >
                         <div className="flex items-center justify-between">
                           <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full font-black text-xs">
-                            {parseFloat(entry.litres).toFixed(2)} Litres
+                            {parseFloat(entry.litres).toFixed(2)} {t('diesel.litres')}
                           </span>
                           <span className="text-slate-400 text-[10px]">
-                            By {entry.adminName}
+                            {t('diesel.recordedBy')} {entry.adminName}
                           </span>
                         </div>
                         <p className="text-slate-700 font-semibold text-xs">
-                          Driver: {entry.driverName} ({entry.driverUsername})
+                          {t('common.driverRole')}: {entry.driverName} ({entry.driverUsername})
                         </p>
                         {entry.notes && (
                           <p className="text-slate-600 bg-white p-2.5 rounded border border-slate-200 italic text-[11px]">
@@ -520,25 +527,25 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               {/* Adjust Trip Count */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
-                  Adjust Trip Count
+                  {t('admin.adjustTripCount')}
                 </h3>
 
                 <form onSubmit={handleAddAdjustment} className="space-y-4 text-xs">
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Target Driver</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('admin.targetDriver')}</label>
                     <select
                       value={targetDriverId}
                       onChange={(e) => setTargetDriverId(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-semibold"
                     >
-                      <option value="">Select Driver</option>
+                      <option value="">Select {t('common.driverRole')}</option>
                       {vehicle.driver1 && <option value={vehicle.driver1.id}>{vehicle.driver1.name}</option>}
                       {vehicle.driver2 && <option value={vehicle.driver2.id}>{vehicle.driver2.name}</option>}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Type</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('admin.adjustmentType')}</label>
                     <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg">
                       <button
                         type="button"
@@ -547,7 +554,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                           adjustmentType === 'add' ? 'bg-blue-900 text-white shadow-sm' : 'text-slate-500'
                         }`}
                       >
-                        Add (+)
+                        {t('admin.addTrips')}
                       </button>
                       <button
                         type="button"
@@ -556,13 +563,13 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                           adjustmentType === 'remove' ? 'bg-blue-900 text-white shadow-sm' : 'text-slate-500'
                         }`}
                       >
-                        Remove (-)
+                        {t('admin.removeTrips')}
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Quantity (Trips)</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('admin.quantity')}</label>
                     <input
                       type="number"
                       min="1"
@@ -573,12 +580,12 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                   </div>
 
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Reason for Adjustment</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('admin.reasonLabel')}</label>
                     <textarea
                       value={adjustmentReason}
                       onChange={(e) => setAdjustmentReason(e.target.value)}
                       rows={3}
-                      placeholder="e.g. Duplicate report detected or Driver forgot to report 2 trips"
+                      placeholder={t('admin.reasonPlaceholder')}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 placeholder-slate-400"
                     ></textarea>
                   </div>
@@ -588,7 +595,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                     disabled={submittingAdj || !targetDriverId}
                     className="w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                   >
-                    {submittingAdj ? 'Submitting...' : 'Apply Adjustment'}
+                    {submittingAdj ? t('admin.adjusting') : t('admin.applyAdjustmentBtn')}
                   </button>
                 </form>
               </div>
@@ -596,25 +603,25 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
               {/* Record Diesel Form Card */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                 <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-3 uppercase tracking-wider text-slate-400">
-                  Update Diesel Log
+                  {t('diesel.pageTitle')}
                 </h3>
 
                 <form onSubmit={handleRecordDiesel} className="space-y-4 text-xs">
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Target Driver</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('admin.targetDriver')}</label>
                     <select
                       value={dieselDriverId}
                       onChange={(e) => setDieselDriverId(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-semibold"
                     >
-                      <option value="">Select Driver</option>
+                      <option value="">Select {t('common.driverRole')}</option>
                       {vehicle.driver1 && <option value={vehicle.driver1.id}>{vehicle.driver1.name}</option>}
                       {vehicle.driver2 && <option value={vehicle.driver2.id}>{vehicle.driver2.name}</option>}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Diesel Taken (Litres)</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('diesel.litres')}</label>
                     <input
                       type="number"
                       step="0.01"
@@ -628,7 +635,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                   </div>
 
                   <div>
-                    <label className="block uppercase font-bold text-slate-400 mb-1">Notes / Receipt Ref (Optional)</label>
+                    <label className="block uppercase font-bold text-slate-400 mb-1">{t('diesel.notesLabel')} (Optional)</label>
                     <input
                       type="text"
                       placeholder="e.g. Full tank at station #4"
@@ -643,7 +650,7 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
                     disabled={submittingDiesel || !dieselDriverId}
                     className="w-full bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg py-2.5 font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                   >
-                    {submittingDiesel ? 'Saving...' : 'Record Diesel Litres'}
+                    {submittingDiesel ? t('common.syncing') : t('common.save')}
                   </button>
                 </form>
               </div>

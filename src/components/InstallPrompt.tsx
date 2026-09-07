@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -8,6 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const { t } = useLanguage();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -81,10 +83,10 @@ export default function InstallPrompt() {
           />
           <div>
             <h3 className="font-extrabold text-base text-slate-900 leading-tight">
-              Install Rentzoo Go
+              {t('pwa.installTitle')}
             </h3>
             <p className="text-xs text-slate-500 font-semibold">
-              Fast trip logging & offline access
+              {t('pwa.installSubtitle')}
             </p>
           </div>
         </div>
@@ -93,14 +95,14 @@ export default function InstallPrompt() {
         {isIOS ? (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700">
             <p className="font-bold text-slate-800">
-              To install this app on your iPhone:
+              {t('pwa.iosInstructionsTitle')}
             </p>
             <div className="flex items-start space-x-2">
               <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-900 rounded-full font-black text-[11px] shrink-0 mt-0.5">
                 1
               </span>
               <p>
-                Tap the <strong className="text-blue-900">Share</strong> button at the bottom of your Safari screen: <span className="text-base font-bold">⎋</span> or <span className="inline-block px-1 bg-slate-200 rounded">⎙</span>
+                {t('pwa.iosStep1')} <span className="text-base font-bold">⎋</span> / <span className="inline-block px-1 bg-slate-200 rounded">⎙</span>
               </p>
             </div>
             <div className="flex items-start space-x-2">
@@ -108,13 +110,13 @@ export default function InstallPrompt() {
                 2
               </span>
               <p>
-                Scroll down and tap <strong className="text-blue-900">"Add to Home Screen" ➕</strong>
+                {t('pwa.iosStep2')} <strong className="text-blue-900">➕</strong>
               </p>
             </div>
           </div>
         ) : (
           <p className="text-xs text-slate-600 leading-relaxed">
-            Install the verified driver & admin app on your home screen for instant one-tap access, notifications, and offline trip logging.
+            {t('pwa.androidDescription')}
           </p>
         )}
 
@@ -125,7 +127,7 @@ export default function InstallPrompt() {
               onClick={handleInstallClick}
               className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-xl py-2.5 text-xs font-bold shadow-md hover:shadow-lg transition-all"
             >
-              Install App
+              {t('pwa.installAppBtn')}
             </button>
           ) : null}
           <button
@@ -134,7 +136,7 @@ export default function InstallPrompt() {
               isIOS || !deferredPrompt ? 'w-full' : 'w-1/3'
             } bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-xs font-bold transition-all`}
           >
-            {isIOS ? 'Got It' : 'Maybe Later'}
+            {isIOS ? t('pwa.gotItBtn') : t('pwa.maybeLaterBtn')}
           </button>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface User {
   id: string;
@@ -52,6 +54,7 @@ interface AuditLog {
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'vehicles' | 'users' | 'assignments' | 'audits'>('vehicles');
   const [loading, setLoading] = useState(true);
 
@@ -345,36 +348,39 @@ export default function SuperAdminDashboard() {
       {/* Header */}
       <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div>
-          <h1 className="font-extrabold text-xl tracking-tight text-blue-400">TripCounter Console</h1>
-          <p className="text-xs text-slate-400 font-semibold">Super Admin Control Hub</p>
+          <h1 className="font-extrabold text-xl tracking-tight text-blue-400">{t('superadmin.consoleTitle')}</h1>
+          <p className="text-xs text-slate-400 font-semibold">{t('superadmin.consoleSubtitle')}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
-        >
-          Logout
-        </button>
+        <div className="flex items-center space-x-3">
+          <LanguageSelector variant="header" />
+          <button
+            onClick={handleLogout}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+          >
+            {t('common.logout')}
+          </button>
+        </div>
       </header>
 
       {/* Tabs */}
       <section className="bg-white border-b border-slate-200 px-6 py-2 shadow-sm">
         <div className="flex space-x-4">
           {[
-            { id: 'vehicles', label: 'Vehicles' },
-            { id: 'users', label: 'Users' },
-            { id: 'assignments', label: 'Assignments' },
-            { id: 'audits', label: 'Audit Logs' },
-          ].map((t) => (
+            { id: 'vehicles', label: t('nav.vehicles') },
+            { id: 'users', label: t('nav.users') },
+            { id: 'assignments', label: t('nav.assignments') },
+            { id: 'audits', label: t('nav.auditLogs') },
+          ].map((tab) => (
             <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id as 'vehicles' | 'users' | 'assignments' | 'audits')}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as 'vehicles' | 'users' | 'assignments' | 'audits')}
               className={`py-3.5 px-1.5 border-b-2 text-xs font-bold uppercase tracking-wider transition-all focus:outline-none ${
-                activeTab === t.id
+                activeTab === tab.id
                   ? 'border-blue-900 text-blue-900'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -396,7 +402,7 @@ export default function SuperAdminDashboard() {
         {loading ? (
           <div className="flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
             <div className="w-8 h-8 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-3 text-slate-500 text-xs font-semibold">Syncing console data...</p>
+            <p className="mt-3 text-slate-500 text-xs font-semibold">{t('common.loading')}</p>
           </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-3">
@@ -405,14 +411,14 @@ export default function SuperAdminDashboard() {
               {/* --- TAB: VEHICLES --- */}
               {activeTab === 'vehicles' && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">All Vehicles</h3>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.allVehicles')}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                          <th className="pb-2">Vehicle Number</th>
-                          <th className="pb-2">Status</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2">{t('superadmin.vehicleNumber')}</th>
+                          <th className="pb-2">{t('common.status')}</th>
+                          <th className="pb-2 text-right">{t('common.actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -429,7 +435,7 @@ export default function SuperAdminDashboard() {
                                     : 'bg-slate-100 text-slate-600'
                                 }`}
                               >
-                                {v.status}
+                                {v.status === 'ACTIVE' ? t('common.active') : v.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
                               </span>
                             </td>
                             <td className="py-3 text-right">
@@ -437,7 +443,7 @@ export default function SuperAdminDashboard() {
                                 onClick={() => startEditVehicle(v)}
                                 className="text-blue-900 hover:text-blue-800 font-bold"
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                             </td>
                           </tr>
@@ -451,16 +457,16 @@ export default function SuperAdminDashboard() {
               {/* --- TAB: USERS --- */}
               {activeTab === 'users' && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">All Users</h3>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.allUsers')}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                          <th className="pb-2">Name</th>
-                          <th className="pb-2">ID / Username</th>
-                          <th className="pb-2">Role</th>
-                          <th className="pb-2">Status</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2">{t('superadmin.fullName')}</th>
+                          <th className="pb-2">{t('superadmin.driverIdOrUsername')}</th>
+                          <th className="pb-2">{t('superadmin.systemRole')}</th>
+                          <th className="pb-2">{t('common.status')}</th>
+                          <th className="pb-2 text-right">{t('common.actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -480,7 +486,7 @@ export default function SuperAdminDashboard() {
                                     : 'bg-slate-100 text-slate-600'
                                 }`}
                               >
-                                {u.role}
+                                {u.role === 'DRIVER' ? t('common.driverRole') : u.role === 'SUPER_ADMIN' ? t('common.superAdminRole') : t('common.adminRole')}
                               </span>
                             </td>
                             <td className="py-3">
@@ -493,7 +499,7 @@ export default function SuperAdminDashboard() {
                                     : 'bg-slate-100 text-slate-600'
                                 }`}
                               >
-                                {u.status}
+                                {u.status === 'ACTIVE' ? t('common.active') : u.status === 'LEAVE' ? t('common.leave') : t('common.inactive')}
                               </span>
                             </td>
                             <td className="py-3 text-right">
@@ -501,7 +507,7 @@ export default function SuperAdminDashboard() {
                                 onClick={() => startEditUser(u)}
                                 className="text-blue-900 hover:text-blue-800 font-bold"
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                             </td>
                           </tr>
@@ -517,16 +523,16 @@ export default function SuperAdminDashboard() {
                 <div className="space-y-6">
                   {/* Driver Assignments */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Driver Assignments</h3>
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.driverAssignments')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                            <th className="pb-2">Vehicle</th>
-                            <th className="pb-2">Driver</th>
-                            <th className="pb-2">Slot</th>
-                            <th className="pb-2">Assigned</th>
-                            <th className="pb-2">Status</th>
+                            <th className="pb-2">{t('diesel.vehicleLabel')}</th>
+                            <th className="pb-2">{t('superadmin.driver')}</th>
+                            <th className="pb-2">{t('superadmin.vehicleSlot')}</th>
+                            <th className="pb-2">{t('common.date')}</th>
+                            <th className="pb-2">{t('common.status')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -534,7 +540,7 @@ export default function SuperAdminDashboard() {
                             <tr key={a.id} className="hover:bg-slate-50">
                               <td className="py-3 font-bold uppercase text-slate-700">{a.vehicleNumber}</td>
                               <td className="py-3 font-semibold text-slate-600">{a.driverName} ({a.driverUsername})</td>
-                              <td className="py-3 font-medium">Slot {a.slot}</td>
+                              <td className="py-3 font-medium">{a.slot === 1 ? t('common.slot1') : t('common.slot2')}</td>
                               <td className="py-3 text-slate-400">{new Date(a.startAt).toLocaleDateString()}</td>
                               <td className="py-3">
                                 <span
@@ -542,7 +548,7 @@ export default function SuperAdminDashboard() {
                                     a.endAt ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'
                                   }`}
                                 >
-                                  {a.endAt ? 'Historical' : 'Active'}
+                                  {a.endAt ? t('common.inactive') : t('common.active')}
                                 </span>
                               </td>
                             </tr>
@@ -554,14 +560,14 @@ export default function SuperAdminDashboard() {
 
                   {/* Admin & Supervisor Assignments */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Admin & Supervisor Vehicle Mappings</h3>
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.adminMappings')}</h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                            <th className="pb-2">Admin / Supervisor Name</th>
-                            <th className="pb-2">Vehicle Number</th>
-                            <th className="pb-2 text-right">Actions</th>
+                            <th className="pb-2">{t('superadmin.adminUser')}</th>
+                            <th className="pb-2">{t('superadmin.vehicleNumber')}</th>
+                            <th className="pb-2 text-right">{t('common.actions')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -574,7 +580,7 @@ export default function SuperAdminDashboard() {
                                   onClick={() => handleAdminRemove(a.adminId, a.vehicleId)}
                                   className="text-red-600 hover:text-red-700 font-bold"
                                 >
-                                  Remove
+                                  {t('common.remove')}
                                 </button>
                               </td>
                             </tr>
@@ -589,7 +595,7 @@ export default function SuperAdminDashboard() {
               {/* --- TAB: AUDITS --- */}
               {activeTab === 'audits' && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">System Audit Trail</h3>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.systemAuditTrail')}</h3>
                   <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
                     {auditLogsList.map((log) => (
                       <div key={log.id} className="border border-slate-100 bg-slate-50 rounded-lg p-3 text-xs space-y-1">
@@ -598,10 +604,10 @@ export default function SuperAdminDashboard() {
                           <span>{new Date(log.createdAt).toLocaleString()}</span>
                         </div>
                         <p className="font-bold text-slate-700 mt-1">
-                          Actor: {log.actorName || 'System'} ({log.actorUsername || 'system'})
+                          {t('superadmin.actor')}: {log.actorName || 'System'} ({log.actorUsername || 'system'})
                         </p>
                         <p className="text-slate-500">
-                          Entity: {log.entityType} ({log.entityId || 'N/A'})
+                          {t('superadmin.entity')}: {log.entityType} ({log.entityId || 'N/A'})
                         </p>
                         {log.metadata && (
                           <pre className="bg-white p-2 rounded border border-slate-200 text-[10px] text-slate-600 overflow-x-auto mt-1">
@@ -621,11 +627,11 @@ export default function SuperAdminDashboard() {
               {activeTab === 'users' && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                   <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">
-                    {editingUserId ? 'Edit User Profile' : 'Register User'}
+                    {editingUserId ? t('superadmin.editUserProfile') : t('superadmin.registerUser')}
                   </h3>
                   <form onSubmit={handleUserSubmit} className="space-y-3.5 text-xs">
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Full Name</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.fullName')}</label>
                       <input
                         type="text"
                         value={userName}
@@ -635,7 +641,7 @@ export default function SuperAdminDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Driver ID or Username</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.driverIdOrUsername')}</label>
                       <input
                         type="text"
                         value={userUsername}
@@ -645,7 +651,7 @@ export default function SuperAdminDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Phone Number</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.phoneNumber')}</label>
                       <input
                         type="text"
                         value={userPhone}
@@ -655,7 +661,7 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div>
                       <label className="block font-bold uppercase text-slate-400 mb-1">
-                        Password {editingUserId && '(leave blank to keep unchanged)'}
+                        {editingUserId ? t('superadmin.passwordLeaveBlank') : 'Password'}
                       </label>
                       <input
                         type="password"
@@ -666,28 +672,28 @@ export default function SuperAdminDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">System Role</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.systemRole')}</label>
                       <select
                         value={userRole}
                         onChange={(e) => setUserRole(e.target.value as 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
-                        <option value="DRIVER">Driver</option>
-                        <option value="ADMIN">Admin</option>
+                        <option value="DRIVER">{t('common.driverRole')}</option>
+                        <option value="ADMIN">{t('common.adminRole')}</option>
                         <option value="SUPERVISOR">Supervisor</option>
-                        <option value="SUPER_ADMIN">Super Admin</option>
+                        <option value="SUPER_ADMIN">{t('common.superAdminRole')}</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Availability Status</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.availabilityStatus')}</label>
                       <select
                         value={userStatus}
                         onChange={(e) => setUserStatus(e.target.value as 'ACTIVE' | 'LEAVE' | 'INACTIVE')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
-                        <option value="ACTIVE">Active</option>
-                        <option value="LEAVE">Leave</option>
-                        <option value="INACTIVE">Inactive</option>
+                        <option value="ACTIVE">{t('common.active')}</option>
+                        <option value="LEAVE">{t('common.leave')}</option>
+                        <option value="INACTIVE">{t('common.inactive')}</option>
                       </select>
                     </div>
                     <div className="flex gap-2 pt-2">
@@ -695,7 +701,7 @@ export default function SuperAdminDashboard() {
                         type="submit"
                         className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow"
                       >
-                        Save User
+                        {t('superadmin.saveUser')}
                       </button>
                       {editingUserId && (
                         <button
@@ -709,7 +715,7 @@ export default function SuperAdminDashboard() {
                           }}
                           className="bg-slate-200 text-slate-600 rounded-lg px-4 py-2.5 font-bold uppercase"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                       )}
                     </div>
@@ -721,11 +727,11 @@ export default function SuperAdminDashboard() {
               {activeTab === 'vehicles' && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                   <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">
-                    {editingVehicleId ? 'Edit Vehicle Status' : 'Add Vehicle'}
+                    {editingVehicleId ? t('superadmin.editVehicleStatus') : t('superadmin.addVehicle')}
                   </h3>
                   <form onSubmit={handleVehicleSubmit} className="space-y-3.5 text-xs">
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Vehicle Registration Number</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.vehicleRegNumber')}</label>
                       <input
                         type="text"
                         value={vehicleNumber}
@@ -735,15 +741,15 @@ export default function SuperAdminDashboard() {
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">Breakdown Status</label>
+                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.breakdownStatus')}</label>
                       <select
                         value={vehicleStatus}
                         onChange={(e) => setVehicleStatus(e.target.value as 'ACTIVE' | 'BREAKDOWN' | 'INACTIVE')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
                       >
-                        <option value="ACTIVE">Active (Available)</option>
-                        <option value="BREAKDOWN">Breakdown</option>
-                        <option value="INACTIVE">Inactive (Deactivated)</option>
+                        <option value="ACTIVE">{t('common.active')}</option>
+                        <option value="BREAKDOWN">{t('common.breakdown')}</option>
+                        <option value="INACTIVE">{t('common.inactive')}</option>
                       </select>
                     </div>
                     <div className="flex gap-2 pt-2">
@@ -751,7 +757,7 @@ export default function SuperAdminDashboard() {
                         type="submit"
                         className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow"
                       >
-                        Save Vehicle
+                        {t('superadmin.saveVehicle')}
                       </button>
                       {editingVehicleId && (
                         <button
@@ -762,7 +768,7 @@ export default function SuperAdminDashboard() {
                           }}
                           className="bg-slate-200 text-slate-600 rounded-lg px-4 py-2.5 font-bold uppercase"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                       )}
                     </div>
@@ -775,30 +781,30 @@ export default function SuperAdminDashboard() {
                 <div className="space-y-6">
                   {/* Assign Driver to Vehicle */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Assign Driver to Slot</h3>
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.assignDriverSlot')}</h3>
                     <form onSubmit={handleDriverAssign} className="space-y-3.5 text-xs">
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">Target Vehicle</label>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.targetVehicle')}</label>
                         <select
                           value={assignVehicleId}
                           onChange={(e) => setAssignVehicleId(e.target.value)}
                           required
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold uppercase"
                         >
-                          <option value="">Select Vehicle</option>
+                          <option value="">Select {t('diesel.vehicleLabel')}</option>
                           {vehiclesList.map((v) => (
                             <option key={v.id} value={v.id}>{v.vehicleNumber} ({v.status})</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">Driver</label>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.driver')}</label>
                         <select
                           value={assignDriverId}
                           onChange={(e) => setAssignDriverId(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
                         >
-                          <option value="">Unassign / Leave Slot Empty</option>
+                          <option value="">{t('superadmin.unassignSlot')}</option>
                           {usersList
                             .filter((u) => u.role === 'DRIVER')
                             .map((u) => (
@@ -807,21 +813,21 @@ export default function SuperAdminDashboard() {
                         </select>
                       </div>
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">Vehicle Slot</label>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.vehicleSlot')}</label>
                         <select
                           value={assignSlot}
                           onChange={(e) => setAssignSlot(parseInt(e.target.value, 10))}
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
                         >
-                          <option value={1}>Driver Slot 1</option>
-                          <option value={2}>Driver Slot 2</option>
+                          <option value={1}>{t('common.slot1')}</option>
+                          <option value={2}>{t('common.slot2')}</option>
                         </select>
                       </div>
                       <button
                         type="submit"
                         className="w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2"
                       >
-                        Update Driver Assignment
+                        {t('superadmin.updateAssignment')}
                       </button>
                     </form>
                   </div>
@@ -829,7 +835,7 @@ export default function SuperAdminDashboard() {
                   {/* Assign Vehicles to Admin / Supervisor */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">Map Vehicles to Admin / Supervisor</h3>
+                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.mapAdminVehicle')}</h3>
                       {assignAdminId && (
                         <div className="flex items-center space-x-2 text-[11px]">
                           <button
@@ -852,14 +858,14 @@ export default function SuperAdminDashboard() {
                     </div>
                     <form onSubmit={handleAdminAssign} className="space-y-3.5 text-xs">
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">System Admin / Supervisor</label>
+                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.adminUser')}</label>
                         <select
                           value={assignAdminId}
                           onChange={(e) => handleAdminSelect(e.target.value)}
                           required
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
                         >
-                          <option value="">Select Admin / Supervisor</option>
+                          <option value="">Select {t('common.adminRole')}</option>
                           {usersList
                             .filter((u) => u.role === 'ADMIN' || u.role === 'SUPERVISOR')
                             .map((u) => (
@@ -870,7 +876,7 @@ export default function SuperAdminDashboard() {
 
                       <div>
                         <label className="block font-bold uppercase text-slate-400 mb-1">
-                          Assigned Vehicles ({assignAdminVehicleIds.length} Selected)
+                          {t('admin.assignedToMe')} ({assignAdminVehicleIds.length})
                         </label>
                         {vehiclesList.length === 0 ? (
                           <p className="text-slate-400 italic py-2">No vehicles available.</p>
@@ -910,7 +916,7 @@ export default function SuperAdminDashboard() {
                         disabled={!assignAdminId}
                         className="w-full bg-blue-900 hover:bg-blue-800 disabled:bg-slate-300 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2 transition-all cursor-pointer"
                       >
-                        Save Admin Vehicle Mappings
+                        {t('superadmin.mapVehicleBtn')}
                       </button>
                     </form>
                   </div>

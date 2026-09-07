@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
 import InstallPrompt from "@/components/InstallPrompt";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TripCounter - Vehicle Trip Verification",
+  title: "Rentzoo Go - Vehicle Trip Verification",
   description: "Mobile-first PWA for vehicle trip counting and verification.",
   manifest: "/manifest.json",
   icons: {
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "TripCounter",
+    title: "Rentzoo Go",
   },
 };
 
@@ -48,9 +49,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50 text-slate-900 flex flex-col">
-        <PwaRegister />
-        <InstallPrompt />
-        {children}
+        <LanguageProvider>
+          <PwaRegister />
+          <InstallPrompt />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

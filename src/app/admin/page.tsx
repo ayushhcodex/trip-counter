@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface UserProfile {
   name: string;
@@ -39,6 +41,7 @@ type DateRange = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<DateRange>('today');
@@ -67,7 +70,6 @@ export default function AdminDashboard() {
   const cacheRef = useRef<Record<string, VehiclesResponse>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
 
   const getCacheKey = useCallback((tab: DateRange, start: string, end: string) => {
     return tab === 'custom' ? `${tab}-${start}-${end}` : tab;
@@ -106,7 +108,7 @@ export default function AdminDashboard() {
       } else if (tab === 'custom') {
         setIsLoading(false);
         setIsRefreshing(false);
-        return; // Don't fetch if custom range is incomplete
+        return;
       }
 
       const res = await fetch(url, { signal: controller.signal });
@@ -208,7 +210,6 @@ export default function AdminDashboard() {
         body: JSON.stringify({ vehicleId, date: dateRangeInfo.start })
       });
       if (res.ok) {
-        // Refresh silently
         fetchVehicles(activeTab, customStartDate, customEndDate, true);
       }
     } catch (err) {
@@ -265,18 +266,17 @@ export default function AdminDashboard() {
       if (res.ok) {
         setAdjStatusMessage({ type: 'success', text: `Adjustment of ${finalAmount > 0 ? '+' : ''}${finalAmount} applied! Driver notified.`, vehicleId });
         setAdjReason('');
-        // Refresh live stats
         fetchVehicles(activeTab, customStartDate, customEndDate, true);
       } else {
         const err = await res.json();
         setAdjStatusMessage({ type: 'error', text: err.error || 'Failed to apply adjustment.', vehicleId });
       }
     } catch {
-      setAdjStatusMessage({ type: 'error', text: 'Network error. Try again.', vehicleId });
+      setAdjStatusMessage({ type: 'error', text: t('common.networkError'), vehicleId });
     } finally {
       setIsSubmittingAdj(false);
     }
-  }, [dateRangeInfo, adjDriverId, adjReason, adjAmount, adjType, activeTab, customStartDate, customEndDate, fetchVehicles]);
+  }, [dateRangeInfo, adjDriverId, adjReason, adjAmount, adjType, activeTab, customStartDate, customEndDate, fetchVehicles, t]);
 
   const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -298,39 +298,31 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-slate-900 text-white border-b border-slate-800 shadow-sm px-4 py-3.5 flex items-center justify-between">
         <div className="flex flex-col">
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">TripCounter</h1>
+          <h1 className="text-xl font-black text-blue-400 tracking-tight">{t('common.appName')}</h1>
           {userProfile && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                userProfile.role === 'SUPERVISOR' ? 'bg-amber-100 text-amber-800' :
-                userProfile.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-800' :
-                'bg-blue-100 text-blue-800'
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                userProfile.role === 'SUPERVISOR' || userProfile.role === 'ADMIN' ? 'bg-blue-800 text-blue-100' :
+                userProfile.role === 'SUPER_ADMIN' ? 'bg-purple-800 text-purple-100' :
+                'bg-blue-800 text-blue-100'
               }`}>
-                {userProfile.role.replace('_', ' ')}
+                {userProfile.role === 'SUPER_ADMIN' ? t('common.superAdminRole') : t('common.adminRole')}
               </span>
-              <span className="text-xs text-slate-500 font-semibold truncate max-w-[100px]">
+              <span className="text-xs text-slate-300 font-bold truncate max-w-[120px]">
                 {userProfile.name}
               </span>
             </div>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[10px] text-slate-500 font-semibold">
-              Live: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <LanguageSelector variant="header" />
           <button 
             onClick={handleLogout}
-            className="text-xs font-bold text-red-600 active:text-red-800 py-1"
+            className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-all"
           >
-            Logout
+            {t('common.logout')}
           </button>
         </div>
       </header>
@@ -338,23 +330,30 @@ export default function AdminDashboard() {
       {/* Tab Bar */}
       <div className="sticky top-[68px] z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2">
-          {['today', 'yesterday', 'week', 'month', 'custom'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleTabChange(tab as DateRange)}
-              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-colors ${
-                activeTab === tab 
-                  ? 'bg-blue-900 text-white shadow-md' 
-                  : 'bg-slate-100 text-slate-600 active:bg-slate-200'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
+          {(['today', 'yesterday', 'week', 'month', 'custom'] as DateRange[]).map((tab) => {
+            const tabLabel =
+              tab === 'today' ? t('common.today') :
+              tab === 'yesterday' ? t('common.yesterday') :
+              tab === 'week' ? t('common.thisWeek') :
+              tab === 'month' ? t('common.thisMonth') : 'Custom';
+            return (
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={`whitespace-nowrap px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-colors ${
+                  activeTab === tab 
+                    ? 'bg-blue-900 text-white shadow-md' 
+                    : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+                }`}
+              >
+                {tabLabel}
+              </button>
+            );
+          })}
         </div>
         {(isLoading || isRefreshing) && (
           <div className="h-0.5 w-full bg-slate-100 overflow-hidden">
-            <div className="h-full bg-blue-500 animate-pulse w-1/3 rounded-r-full"></div>
+            <div className="h-full bg-blue-600 animate-pulse w-1/3 rounded-r-full"></div>
           </div>
         )}
       </div>
@@ -397,10 +396,10 @@ export default function AdminDashboard() {
         <div className="mb-4 relative">
           <input 
             type="text" 
-            placeholder="Search vehicle or driver..." 
+            placeholder="Search vehicle number or driver..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-10 pr-4 shadow-sm text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-10 pr-4 shadow-sm text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
           />
           <svg className="w-5 h-5 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -411,11 +410,11 @@ export default function AdminDashboard() {
         {isLoading && !isRefreshing && vehicles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-900 rounded-full animate-spin"></div>
-            <p className="mt-4 text-sm font-semibold text-slate-500">Loading vehicles...</p>
+            <p className="mt-4 text-sm font-semibold text-slate-500">{t('common.loading')}</p>
           </div>
         ) : filteredVehicles.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100">
-            <p className="text-slate-500 font-semibold">No assigned vehicles found.</p>
+          <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <p className="text-slate-500 font-semibold">{t('admin.fleetTitle')}: No vehicles found.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -439,13 +438,13 @@ export default function AdminDashboard() {
                     onClick={() => setExpandedVehicleId(isExpanded ? null : vehicle.id)}
                     className="p-4 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors"
                   >
-                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight truncate">
                           {vehicle.vehicleNumber}
                         </h2>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
-                          {vehicle.status}
+                          {vehicle.status === 'ACTIVE' ? t('common.active') : vehicle.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 font-semibold truncate">
@@ -465,17 +464,17 @@ export default function AdminDashboard() {
                       {/* Summary Row */}
                       <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                         <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">Reported</div>
+                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.reportedTrips')}</div>
                           <div className="text-lg font-black text-slate-800">{vehicle.reportedCount}</div>
                         </div>
                         <div className="w-px h-8 bg-slate-200"></div>
                         <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">Adjusted</div>
+                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.adjustmentsTotal')}</div>
                           <div className="text-lg font-black text-slate-800">{vehicle.adjustmentTotal}</div>
                         </div>
                         <div className="w-px h-8 bg-slate-200"></div>
                         <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">Verified</div>
+                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.verifiedTrips')}</div>
                           <div className="text-lg font-black text-slate-800">{vehicle.verifiedCount}</div>
                         </div>
                       </div>
@@ -485,17 +484,17 @@ export default function AdminDashboard() {
                         {isSingleDay && vehicle.verificationStatus !== 'VERIFIED' && (
                           <button
                             onClick={() => handleVerify(vehicle.id)}
-                            className="w-full bg-emerald-600 active:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                            Verify Today&apos;s Trips
+                            {t('admin.verifyCountBtn')}
                           </button>
                         )}
 
                         {vehicle.verificationStatus === 'VERIFIED' && isSingleDay && (
                           <div className="w-full bg-emerald-50 text-emerald-700 py-2 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200 text-xs">
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                            Verified
+                            {t('admin.verifiedBadge')}
                           </div>
                         )}
 
@@ -508,14 +507,14 @@ export default function AdminDashboard() {
                                 : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200'
                             }`}
                           >
-                            <span>⚡</span> {activeAdjustVehicleId === vehicle.id ? 'Close Adjust' : 'Adjust Trips (+/-)'}
+                            <span>⚡</span> {activeAdjustVehicleId === vehicle.id ? t('common.cancel') : t('admin.adjustTripCount')}
                           </button>
 
                           <button
                             onClick={() => router.push(`/admin/vehicle/${vehicle.id}`)}
-                            className="bg-slate-800 active:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
+                            className="bg-slate-800 hover:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
                           >
-                            <span>⛽</span> Fuel & Details →
+                            <span>⛽</span> {t('diesel.pageTitle')} →
                           </button>
                         </div>
                       </div>
@@ -525,7 +524,7 @@ export default function AdminDashboard() {
                         <div className="mb-4 bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-3">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                             <h4 className="font-extrabold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
-                              <span>⚡</span> Adjust Trip Count
+                              <span>⚡</span> {t('admin.adjustTripCount')}
                             </h4>
                             <span className="text-[10px] text-slate-400 font-semibold">{dateRangeInfo?.start}</span>
                           </div>
@@ -542,7 +541,7 @@ export default function AdminDashboard() {
 
                           <form onSubmit={(e) => handleApplyAdjustment(e, vehicle.id)} className="space-y-2.5 text-xs">
                             <div>
-                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Target Driver</label>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.targetDriver')}</label>
                               <select
                                 value={adjDriverId}
                                 onChange={(e) => setAdjDriverId(e.target.value)}
@@ -550,14 +549,14 @@ export default function AdminDashboard() {
                                 required
                               >
                                 <option value="">Select Driver</option>
-                                {vehicle.driver1 && <option value={vehicle.driver1.id}>Slot 1: {vehicle.driver1.name} ({vehicle.driver1.reportedCount} trips)</option>}
-                                {vehicle.driver2 && <option value={vehicle.driver2.id}>Slot 2: {vehicle.driver2.name} ({vehicle.driver2.reportedCount} trips)</option>}
+                                {vehicle.driver1 && <option value={vehicle.driver1.id}>{t('common.slot1')}: {vehicle.driver1.name} ({vehicle.driver1.reportedCount} trips)</option>}
+                                {vehicle.driver2 && <option value={vehicle.driver2.id}>{t('common.slot2')}: {vehicle.driver2.name} ({vehicle.driver2.reportedCount} trips)</option>}
                               </select>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Type</label>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.adjustmentType')}</label>
                                 <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
                                   <button
                                     type="button"
@@ -566,7 +565,7 @@ export default function AdminDashboard() {
                                       adjType === 'add' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500'
                                     }`}
                                   >
-                                    + Add
+                                    {t('admin.addTrips')}
                                   </button>
                                   <button
                                     type="button"
@@ -575,13 +574,13 @@ export default function AdminDashboard() {
                                       adjType === 'remove' ? 'bg-red-600 text-white shadow-xs' : 'text-slate-500'
                                     }`}
                                   >
-                                    - Remove
+                                    {t('admin.removeTrips')}
                                   </button>
                                 </div>
                               </div>
 
                               <div>
-                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Trips</label>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.quantity')}</label>
                                 <input
                                   type="number"
                                   min="1"
@@ -595,10 +594,10 @@ export default function AdminDashboard() {
                             </div>
 
                             <div>
-                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Mandatory Reason</label>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.reasonLabel')}</label>
                               <input
                                 type="text"
-                                placeholder="e.g. Duplicate report detected or missed logging"
+                                placeholder={t('admin.reasonPlaceholder')}
                                 value={adjReason}
                                 onChange={(e) => setAdjReason(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700"
@@ -612,14 +611,14 @@ export default function AdminDashboard() {
                                 disabled={isSubmittingAdj || !adjDriverId}
                                 className="flex-1 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg py-2 font-bold uppercase shadow-xs transition-all text-xs"
                               >
-                                {isSubmittingAdj ? 'Applying...' : `Apply ${adjType === 'add' ? '+' : '-'}${adjAmount || '1'} Trips`}
+                                {isSubmittingAdj ? t('admin.adjusting') : `${t('admin.applyAdjustmentBtn')} (${adjType === 'add' ? '+' : '-'}${adjAmount || '1'})`}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setActiveAdjustVehicleId(null)}
                                 className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-2 font-bold text-xs"
                               >
-                                Cancel
+                                {t('common.cancel')}
                               </button>
                             </div>
                           </form>
@@ -629,21 +628,21 @@ export default function AdminDashboard() {
                       {/* Driver Breakdown */}
                       <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
                         <div className="flex justify-between items-center text-slate-600">
-                          <span className="font-semibold text-[11px]">Slot 1: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
+                          <span className="font-semibold text-[11px]">{t('common.slot1')}: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
                           <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} trips</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-600 border-t border-slate-50 pt-1">
-                          <span className="font-semibold text-[11px]">Slot 2: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
+                          <span className="font-semibold text-[11px]">{t('common.slot2')}: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
                           <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} trips</span>
                         </div>
                       </div>
 
                       {/* Trips List */}
                       <div>
-                        <h3 className="text-xs font-bold uppercase text-slate-500 mb-2 px-1">Trip History</h3>
+                        <h3 className="text-xs font-bold uppercase text-slate-500 mb-2 px-1">{t('driver.historyTitle')}</h3>
                         {vehicle.trips.length === 0 ? (
                           <div className="bg-white p-4 rounded-xl border border-slate-100 text-center text-sm font-semibold text-slate-400">
-                            No trips recorded
+                            {t('driver.noTripsLogged')}
                           </div>
                         ) : (
                           <div className="flex flex-col gap-2">

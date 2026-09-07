@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +23,7 @@ export default function LoginPage() {
     const cleanPass = password.trim();
 
     if (!cleanUser || !cleanPass) {
-      setErrorMsg('Please enter both your ID/Username and Password.');
+      setErrorMsg(t('auth.invalidCredentials'));
       return;
     }
 
@@ -35,7 +38,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setErrorMsg(data.error || 'Invalid credentials or login failed.');
+        setErrorMsg(data.error || t('auth.invalidCredentials'));
         setSubmitting(false);
         return;
       }
@@ -57,37 +60,45 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error('Login request failed:', err);
-      setErrorMsg('Network error. Please try again.');
+      setErrorMsg(t('common.networkError'));
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center min-h-screen bg-slate-100 p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 border border-slate-200">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black text-blue-900 tracking-tight">TripCounter</h1>
-          <p className="text-slate-500 text-sm mt-1 font-semibold">
-            Sign in to your account
-          </p>
+    <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 sm:p-6">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8 border border-slate-200 space-y-6">
+        {/* Top Header & Language Picker */}
+        <div className="flex flex-col items-center justify-center text-center space-y-3">
+          <div className="w-full flex justify-end">
+            <LanguageSelector variant="segmented" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-blue-900 tracking-tight">
+              {t('auth.title')}
+            </h1>
+            <p className="text-slate-500 text-xs sm:text-sm mt-1 font-semibold">
+              {t('auth.subtitle')}
+            </p>
+          </div>
         </div>
 
         {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-xs font-semibold mb-6 text-center">
+          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold text-center">
             {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs uppercase font-bold tracking-wider text-slate-400 mb-1.5">
-              Driver ID or Username/Email
+              {t('auth.usernameLabel')}
             </label>
             <input
               type="text"
               value={usernameOrEmail}
               onChange={(e) => setUsernameOrEmail(e.target.value)}
-              placeholder="e.g. drv001 or superadmin@tripcounter.org"
+              placeholder={t('auth.usernamePlaceholder')}
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
@@ -98,7 +109,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-xs uppercase font-bold tracking-wider text-slate-400">
-                Password
+                {t('auth.passwordLabel')}
               </label>
               <button
                 type="button"
@@ -127,12 +138,13 @@ export default function LoginPage() {
               submitting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {submitting ? 'Signing in...' : 'Sign In'}
+            {submitting ? t('auth.signingIn') : t('auth.signInBtn')}
           </button>
         </form>
 
-        <div className="mt-8 text-center text-xs text-slate-400 font-semibold border-t border-slate-100 pt-6">
-          Authorized personnel only. Contact administration for account setup.
+        <div className="text-center text-[11px] text-slate-400 font-semibold border-t border-slate-100 pt-4 space-y-1">
+          <p>{t('auth.driverIdHint')}</p>
+          <p className="text-slate-500">{t('auth.rolesHint')}</p>
         </div>
       </div>
     </div>

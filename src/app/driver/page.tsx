@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getQueuedTrips, saveQueuedTrip, removeQueuedTrips, OfflineTrip } from '@/lib/indexeddb';
 import { getShiftInfo } from '@/lib/shifts';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface TripItem {
   id: string;
@@ -31,6 +33,7 @@ function generateUUID(): string {
 
 export default function DriverDashboard() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [driverName, setDriverName] = useState('');
   const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
@@ -90,7 +93,7 @@ export default function DriverDashboard() {
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      setErrorMsg('Failed to load connection data.');
+      setErrorMsg(t('common.networkError'));
     } finally {
       setLoading(false);
     }
@@ -99,52 +102,50 @@ export default function DriverDashboard() {
   useEffect(() => {
     loadDashboardData();
 
-    // Listen to network status change
+    // Setup network status listeners
     const handleOnline = () => {
       setIsOnline(true);
       triggerSync();
     };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // 2. Synchronize IndexedDB queue with backend
+  // 2. Trigger sync of offline queue
   const triggerSync = async () => {
-    const queued = await getQueuedTrips();
-    if (queued.length === 0) return;
-
     try {
+      const queue = await getQueuedTrips();
+      if (queue.length === 0) return;
+
       const res = await fetch('/api/trips/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trips: queued }),
+        body: JSON.stringify({ trips: queue }),
       });
 
       if (res.ok) {
-        const result = await res.json();
-        // Clear synced items from local db
-        const keys = queued.map((q) => q.idempotencyKey);
-        await removeQueuedTrips(keys);
-        
-        // Reload dashboard
-        await loadDashboardData();
+        await removeQueuedTrips(queue.map((q) => q.idempotencyKey));
+        const remaining = await getQueuedTrips();
+        setOfflineQueue(remaining);
+        // Refresh today's trips
+        loadDashboardData();
       }
-    } catch (err) {
-      console.error('Offline synchronization failed:', err);
+    } catch (error) {
+      console.error('Offline sync failed:', error);
     }
   };
 
-  // 3. COMPLETE TRIP Action
+  // 3. Complete Trip Action
   const handleCompleteTrip = async () => {
-    if (!vehicle) return;
+    if (!vehicle || submitting) return;
+
     setErrorMsg('');
     setSubmitting(true);
 
@@ -156,47 +157,37 @@ export default function DriverDashboard() {
       try {
         const offlineTrip: OfflineTrip = { idempotencyKey, completedAt };
         await saveQueuedTrip(offlineTrip);
-        
-        const localTrip: TripItem = {
-          id: idempotencyKey,
-          completedAt,
-          isOffline: true,
-        };
-
-        setTodayTrips((prev) => [localTrip, ...prev]);
+        setTodayTrips((prev) => [{ id: idempotencyKey, completedAt, isOffline: true }, ...prev]);
         const updatedQueue = await getQueuedTrips();
         setOfflineQueue(updatedQueue);
       } catch (err) {
-        console.error('Failed to log trip offline:', err);
-        setErrorMsg('Failed to log trip locally.');
+        setErrorMsg('Failed to save offline trip locally.');
       } finally {
         setSubmitting(false);
       }
       return;
     }
 
-    // Online mode: submit directly
     try {
       const res = await fetch('/api/trips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotencyKey, completedAt }),
+        body: JSON.stringify({
+          vehicleId: vehicle.id,
+          completedAt,
+          idempotencyKey,
+        }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        setErrorMsg(errorData.error || 'Failed to submit trip.');
-        return;
-      }
-
       const data = await res.json();
-      if (data.success) {
-        // Reload to get updated db values
-        await loadDashboardData();
+      if (res.ok && data.success) {
+        setTodayTrips((prev) => [data.trip, ...prev]);
+      } else {
+        setErrorMsg(data.error || 'Failed to complete trip.');
       }
-    } catch (err) {
-      console.error('Failed to submit trip:', err);
-      // Fallback to offline queue if request failed due to sudden network loss
+    } catch (error) {
+      console.error('Network failure, queueing trip locally:', error);
+      // Fallback: network failure midway, queue in IndexedDB
       try {
         const offlineTrip: OfflineTrip = { idempotencyKey, completedAt };
         await saveQueuedTrip(offlineTrip);
@@ -226,14 +217,14 @@ export default function DriverDashboard() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-slate-600 font-medium">Loading Dashboard...</p>
+        <p className="mt-4 text-slate-600 font-medium">{t('common.loading')}</p>
       </div>
     );
   }
 
   // Calculate last trip time format
   const getLastTripTime = () => {
-    if (todayTrips.length === 0) return 'No trips today';
+    if (todayTrips.length === 0) return t('driver.noTripsLogged');
     const last = todayTrips[0];
     const date = new Date(last.completedAt);
     return date.toLocaleTimeString('en-US', {
@@ -246,102 +237,107 @@ export default function DriverDashboard() {
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full bg-slate-50 shadow-md min-h-screen">
       {/* Header */}
-      <header className="bg-blue-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <header className="bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div>
-          <h1 className="font-bold text-lg tracking-tight">TripCounter</h1>
-          <p className="text-xs text-blue-200">Driver Portal</p>
+          <h1 className="font-black text-lg tracking-tight text-blue-400">{t('common.appName')}</h1>
+          <p className="text-[11px] text-slate-400 font-semibold">{t('driver.portalTitle')}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="bg-blue-800 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-md font-semibold transition-colors"
-        >
-          Logout
-        </button>
+        <div className="flex items-center space-x-2">
+          <LanguageSelector variant="header" />
+          <button
+            onClick={handleLogout}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg font-bold transition-all"
+          >
+            {t('common.logout')}
+          </button>
+        </div>
       </header>
 
       {/* Network & Warning Status Alerts */}
       {!isOnline && (
         <div className="bg-amber-500 text-white text-center text-xs py-1.5 font-semibold px-4">
-          Offline Mode. Trips will queue locally and auto-sync when online.
+          {t('driver.offlineModeNotice')}
         </div>
       )}
       {offlineQueue.length > 0 && isOnline && (
         <div className="bg-blue-600 text-white text-center text-xs py-1.5 font-semibold px-4 flex justify-between items-center">
-          <span>Unsynced offline trips: {offlineQueue.length}</span>
+          <span>{offlineQueue.length} {t('driver.queuedTripsCount')}</span>
           <button
             onClick={triggerSync}
             className="bg-white text-blue-700 px-2 py-0.5 rounded text-[10px] uppercase font-bold"
           >
-            Sync Now
+            {t('common.syncing')}
           </button>
         </div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-6 flex flex-col items-center">
+      <main className="flex-1 p-5 flex flex-col items-center">
         {/* Welcome Block */}
         <div className="w-full text-center mb-4">
-          <h2 className="text-xl font-bold text-slate-800">Welcome, {driverName}</h2>
+          <h2 className="text-xl font-bold text-slate-800">
+            {driverName}
+          </h2>
           {vehicle ? (
-            <div className="flex flex-col items-center mt-1 space-y-1">
-              <p className="text-sm font-semibold text-slate-500">
-                Vehicle: <span className="text-blue-900 uppercase font-extrabold">{vehicle.vehicleNumber}</span> (Slot {vehicle.slot})
+            <div className="flex flex-col items-center mt-1.5 space-y-1.5">
+              <p className="text-xs sm:text-sm font-semibold text-slate-500">
+                {t('driver.assignedVehicle')}: <span className="text-blue-900 uppercase font-extrabold">{vehicle.vehicleNumber}</span> ({vehicle.slot === 1 ? t('common.slot1') : t('common.slot2')})
               </p>
-              <div className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-full text-xs font-bold">
-                <span>⏰ {currentShift.shiftName}</span>
+              <div className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-full text-xs font-bold">
+                <span>⏰ {currentShift.shiftNumber === 1 ? t('common.dayShift') : t('common.nightShift')}</span>
               </div>
             </div>
           ) : (
-            <div className="bg-red-50 text-red-600 border border-red-200 rounded-md p-3 mt-2 text-xs font-semibold">
-              No active vehicle assigned. You cannot report trips.
+            <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-3 mt-2 text-xs font-semibold">
+              <p className="font-bold">{t('driver.noVehicleAssigned')}</p>
+              <p className="mt-0.5 text-slate-600">{t('driver.contactAdmin')}</p>
             </div>
           )}
         </div>
 
         {errorMsg && (
-          <div className="w-full bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-md text-xs mb-4 font-semibold text-center">
+          <div className="w-full bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs mb-4 font-semibold text-center">
             {errorMsg}
           </div>
         )}
 
         {/* Today's Count */}
-        <div className="flex flex-col items-center justify-center my-4">
-          <span className="text-xs uppercase font-bold tracking-wider text-slate-400">Today's Trips</span>
-          <span className="text-7xl font-black text-slate-800 tracking-tighter my-2">
+        <div className="flex flex-col items-center justify-center my-2">
+          <span className="text-xs uppercase font-bold tracking-wider text-slate-400">{t('driver.todaysTrips')}</span>
+          <span className="text-7xl font-black text-slate-800 tracking-tighter my-1">
             {todayTrips.length}
           </span>
           <span className="text-xs text-slate-500 font-semibold">
-            Last trip: {getLastTripTime()}
+            {getLastTripTime()}
           </span>
         </div>
 
         {/* Complete Trip Button */}
-        <div className="my-8">
+        <div className="my-6">
           <button
             disabled={!vehicle || submitting}
             onClick={handleCompleteTrip}
-            className={`w-48 h-48 rounded-full flex flex-col items-center justify-center text-center font-bold text-xl shadow-lg border-8 border-white transition-all transform active:scale-95 select-none focus:outline-none ${
+            className={`w-48 h-48 rounded-full flex flex-col items-center justify-center text-center font-black text-lg sm:text-xl shadow-xl border-8 border-white transition-all transform active:scale-95 select-none focus:outline-none ${
               vehicle && !submitting
-                ? 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-xl active:bg-blue-800'
+                ? 'bg-blue-900 hover:bg-blue-800 text-white hover:shadow-2xl active:bg-blue-950'
                 : 'bg-slate-300 text-slate-500 cursor-not-allowed border-slate-200'
             }`}
           >
-            <span>COMPLETE</span>
-            <span className="text-sm tracking-wide mt-1">TRIP</span>
+            <span className="leading-tight px-4">{t('driver.completeTripBtn')}</span>
           </button>
         </div>
 
         {/* Recent Activity List */}
-        <div className="w-full mt-4 flex-1">
-          <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-3 text-left">
-            Today's Logged Trips
+        <div className="w-full mt-2 flex-1">
+          <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-2.5 text-left">
+            {t('driver.todaysTrips')}
           </h3>
           {todayTrips.length === 0 ? (
-            <div className="bg-white rounded-lg border border-slate-100 p-6 text-center text-xs text-slate-400">
-              No trips reported today.
+            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-xs text-slate-400 font-semibold">
+              {t('driver.noTripsLogged')}
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-slate-100 divide-y divide-slate-100 max-h-56 overflow-y-auto shadow-sm">
+            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-56 overflow-y-auto shadow-sm">
               {[...todayTrips]
                 .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime())
                 .map((trip, idx) => {
@@ -357,22 +353,22 @@ export default function DriverDashboard() {
                     <div key={trip.id} className="px-4 py-3 flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-slate-800">
-                          Trip Completed {idx + 1}
+                          {t('driver.tripNumber')} #{idx + 1}
                         </span>
                         <div className="flex items-center space-x-2 mt-0.5">
-                          <span className="text-[10px] text-slate-400 font-medium">Time: {timeStr}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{timeStr}</span>
                           <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold border border-slate-200">
-                            {shift.shiftLabel}
+                            {shift.shiftNumber === 1 ? t('common.slot1') : t('common.slot2')}
                           </span>
                         </div>
                       </div>
                       {trip.isOffline ? (
-                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase">
-                          Queued
+                        <span className="bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase">
+                          {t('common.offline')}
                         </span>
                       ) : (
-                        <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase">
-                          Synced
+                        <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase">
+                          {t('common.verified')}
                         </span>
                       )}
                     </div>
@@ -390,21 +386,21 @@ export default function DriverDashboard() {
           className="flex flex-col items-center text-blue-900 font-bold text-xs"
         >
           <span className="text-lg">📊</span>
-          <span>Dashboard</span>
+          <span>{t('nav.dashboard')}</span>
         </button>
         <button
           onClick={() => router.push('/driver/history')}
           className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">📅</span>
-          <span>My Trips</span>
+          <span>{t('nav.myTrips')}</span>
         </button>
         <button
           onClick={() => router.push('/driver/diesel')}
           className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">⛽</span>
-          <span>Diesel</span>
+          <span>{t('nav.diesel')}</span>
         </button>
         <button
           onClick={() => router.push('/driver/notifications')}
@@ -414,7 +410,7 @@ export default function DriverDashboard() {
             <span className="absolute top-0.5 right-4 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>
           )}
           <span className="text-lg">🔔</span>
-          <span>Notifications</span>
+          <span>{t('nav.notifications')}</span>
         </button>
       </footer>
     </div>

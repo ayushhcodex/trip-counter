@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface NotificationItem {
   id: string;
@@ -15,6 +17,7 @@ interface NotificationItem {
 
 export default function DriverNotifications() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
@@ -33,7 +36,7 @@ export default function DriverNotifications() {
       }
     } catch (error) {
       console.error('Failed to load notifications:', error);
-      setErrorMsg('Failed to load notifications.');
+      setErrorMsg(t('common.networkError'));
     } finally {
       setLoading(false);
     }
@@ -72,7 +75,7 @@ export default function DriverNotifications() {
       await loadNotifications();
     } catch (error) {
       console.error('Failed to process acknowledgment:', error);
-      setErrorMsg('Network error. Try again.');
+      setErrorMsg(t('common.networkError'));
     } finally {
       setAckLoading(null);
     }
@@ -95,7 +98,7 @@ export default function DriverNotifications() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-slate-600 font-medium">Loading Notifications...</p>
+        <p className="mt-4 text-slate-600 font-medium">{t('common.loading')}</p>
       </div>
     );
   }
@@ -103,43 +106,48 @@ export default function DriverNotifications() {
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full bg-slate-50 shadow-md min-h-screen">
       {/* Header */}
-      <header className="bg-blue-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <header className="bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-3">
           <button
             onClick={() => router.push('/driver')}
-            className="text-white hover:text-blue-200 text-sm font-semibold focus:outline-none"
+            className="text-slate-300 hover:text-white text-xs font-bold focus:outline-none bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all"
           >
-            ← Back
+            ← {t('common.back')}
           </button>
-          <h1 className="font-bold text-lg tracking-tight">Notifications</h1>
+          <h1 className="font-bold text-base tracking-tight">{t('driver.notificationsTitle')}</h1>
         </div>
-        {notifications.some((n) => !n.readAt) && (
-          <button
-            onClick={handleMarkAllRead}
-            className="text-xs bg-blue-800 hover:bg-blue-700 text-white px-2 py-1 rounded font-semibold"
-          >
-            Mark all read
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {notifications.some((n) => !n.readAt) && (
+            <button
+              onClick={handleMarkAllRead}
+              className="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg font-bold border border-slate-700 transition-all"
+            >
+              {t('driver.markAllRead')}
+            </button>
+          )}
+          <LanguageSelector variant="header" />
+        </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 p-4 space-y-4">
         {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-md text-xs font-semibold text-center">
+          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold text-center">
             {errorMsg}
           </div>
         )}
 
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-100 p-8 text-center text-sm text-slate-400">
-            No notifications.
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-400 font-semibold">
+            {t('driver.noNotifications')}
           </div>
         ) : (
           <div className="space-y-3.5">
             {notifications.map((notif) => {
               const isUnread = !notif.readAt;
-              const dateStr = new Date(notif.createdAt).toLocaleDateString('en-US', {
+              const d = new Date(notif.createdAt);
+              const locale = language === 'hi' ? 'hi-IN' : language === 'gu' ? 'gu-IN' : 'en-US';
+              const dateStr = d.toLocaleDateString(locale, {
                 day: '2-digit',
                 month: 'short',
                 hour: '2-digit',
@@ -156,7 +164,7 @@ export default function DriverNotifications() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-blue-800 tracking-wide uppercase">
+                    <span className="text-[10px] font-extrabold text-blue-900 tracking-wide uppercase">
                       {notif.type.replace('_', ' ')}
                     </span>
                     <span className="text-[10px] text-slate-400 font-semibold">{dateStr}</span>
@@ -177,7 +185,7 @@ export default function DriverNotifications() {
                         onClick={() => handleAcknowledge(notif.relatedEntityId!, notif.id)}
                         className="bg-blue-900 hover:bg-blue-800 text-white text-xs px-4 py-2 rounded-lg font-bold shadow-sm transition-colors"
                       >
-                        {ackLoading === notif.id ? 'Loading...' : 'I Understand'}
+                        {ackLoading === notif.id ? t('common.loading') : t('driver.acknowledgeBtn')}
                       </button>
                     </div>
                   )}
@@ -192,31 +200,31 @@ export default function DriverNotifications() {
       <footer className="bg-white border-t border-slate-200 flex justify-around py-2.5 sticky bottom-0 z-10">
         <button
           onClick={() => router.push('/driver')}
-          className="flex flex-col items-center text-slate-400 text-xs font-semibold"
+          className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">📊</span>
-          <span>Dashboard</span>
+          <span>{t('nav.dashboard')}</span>
         </button>
         <button
           onClick={() => router.push('/driver/history')}
-          className="flex flex-col items-center text-slate-400 text-xs font-semibold"
+          className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">📅</span>
-          <span>My Trips</span>
+          <span>{t('nav.myTrips')}</span>
         </button>
         <button
           onClick={() => router.push('/driver/diesel')}
-          className="flex flex-col items-center text-slate-400 hover:text-blue-900 text-xs font-semibold"
+          className="flex flex-col items-center text-slate-500 hover:text-blue-900 text-xs font-semibold"
         >
           <span className="text-lg">⛽</span>
-          <span>Diesel</span>
+          <span>{t('nav.diesel')}</span>
         </button>
         <button
           onClick={() => loadNotifications()}
           className="flex flex-col items-center text-blue-900 font-bold text-xs"
         >
           <span className="text-lg">🔔</span>
-          <span>Notifications</span>
+          <span>{t('nav.notifications')}</span>
         </button>
       </footer>
     </div>
