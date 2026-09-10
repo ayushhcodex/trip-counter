@@ -606,12 +606,25 @@ export default function AdminDashboard() {
   }, []);
 
   const handleQuickAdjust = useCallback((vehicle: Vehicle, type: 'add' | 'remove') => {
-    setActiveAdjustVehicleId(vehicle.id);
-    setAdjDriverId(vehicle.driver1?.id || vehicle.driver2?.id || '');
-    setAdjType(type);
-    setAdjAmount('1');
-    setAdjReason('');
-    setAdjStatusMessage(null);
+    setActiveAdjustVehicleId((currentActiveId) => {
+      if (currentActiveId === vehicle.id) {
+        setAdjType((currentType) => {
+          if (currentType === type) {
+            setAdjAmount((prev) => String((parseInt(prev, 10) || 0) + 1));
+          } else {
+            setAdjAmount('1');
+          }
+          return type;
+        });
+      } else {
+        setAdjDriverId(vehicle.driver1?.id || vehicle.driver2?.id || '');
+        setAdjType(type);
+        setAdjAmount('1');
+        setAdjReason('');
+        setAdjStatusMessage(null);
+      }
+      return vehicle.id;
+    });
     setExpandedVehicleId(vehicle.id);
   }, []);
 
