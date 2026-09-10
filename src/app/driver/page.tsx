@@ -6,6 +6,7 @@ import { getQueuedTrips, saveQueuedTrip, removeQueuedTrips, OfflineTrip } from '
 import { getShiftInfo } from '@/lib/shifts';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import SiteLoader from '@/components/SiteLoader';
 
 interface TripItem {
   id: string;
@@ -269,9 +270,8 @@ export default function DriverDashboard() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-slate-600 font-medium">{t('common.loading')}</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 min-h-screen">
+        <SiteLoader />
       </div>
     );
   }

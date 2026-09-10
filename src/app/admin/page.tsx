@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useTransition, useMemo
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import SiteLoader from '@/components/SiteLoader';
 
 interface UserProfile {
   name: string;
@@ -996,8 +997,7 @@ export default function AdminDashboard() {
         {/* Vehicle List */}
         {isLoading && !isRefreshing && vehicles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-900 rounded-full animate-spin"></div>
-            <p className="mt-4 text-sm font-semibold text-slate-500">{t('common.loading')}</p>
+            <SiteLoader />
           </div>
         ) : filteredVehicles.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">

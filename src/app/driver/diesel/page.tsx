@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import SiteLoader from '@/components/SiteLoader';
 
 interface DieselEntry {
   id: string;
@@ -260,9 +261,8 @@ export default function DriverDieselPage() {
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-3 text-slate-600 text-xs font-bold uppercase tracking-wider">{t('common.loading')}</p>
+            <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <SiteLoader />
             </div>
           ) : entries.length === 0 ? (
             <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 shadow-sm font-bold flex flex-col items-center gap-2">
