@@ -130,16 +130,17 @@ export default function DriverNotifications() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 space-y-4">
+      <main className="flex-1 p-4 space-y-4 max-w-md mx-auto w-full">
         {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold text-center">
+          <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-2.5 rounded-xl text-xs font-bold text-center">
             {errorMsg}
           </div>
         )}
 
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-400 font-semibold">
-            {t('driver.noNotifications')}
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 shadow-sm font-bold flex flex-col items-center gap-2">
+            <span className="text-4xl">🔔</span>
+            <span>{t('driver.noNotifications')}</span>
           </div>
         ) : (
           <div className="space-y-3.5">
@@ -154,38 +155,63 @@ export default function DriverNotifications() {
                 minute: '2-digit',
               });
 
+              // Determine visual icon and styling based on notification content/type
+              const isDiesel = notif.message.toLowerCase().includes('diesel') || notif.type.toLowerCase().includes('diesel');
+              const isTripAdj = notif.type === 'TRIP_ADJUSTMENT';
+
+              const icon = isDiesel ? '⛽' : isTripAdj ? '🔢' : '📢';
+              const badgeBg = isDiesel
+                ? 'bg-amber-100 text-amber-950 border-amber-300'
+                : isTripAdj
+                ? 'bg-blue-100 text-blue-950 border-blue-300'
+                : 'bg-slate-100 text-slate-900 border-slate-300';
+
               return (
                 <div
                   key={notif.id}
-                  className={`border rounded-xl p-4 shadow-sm transition-colors ${
+                  className={`border-2 rounded-2xl p-4 shadow-sm transition-all ${
                     isUnread
-                      ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100'
-                      : 'bg-white border-slate-200'
+                      ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-200/50 shadow-md'
+                      : 'bg-white border-slate-200/80'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-blue-900 tracking-wide uppercase">
-                      {notif.type.replace('_', ' ')}
+                  {/* Top Bar: Icon Badge, Category & Date */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-base px-2 py-0.5 rounded-lg border font-black ${badgeBg}`}>
+                        {icon} {isDiesel ? 'Diesel' : isTripAdj ? 'Trip Update' : 'Notice'}
+                      </span>
+                      {isUnread && (
+                        <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse uppercase tracking-wider">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
+                      <span>📅</span> {dateStr}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-semibold">{dateStr}</span>
                   </div>
 
-                  <h3 className="font-bold text-slate-800 text-sm mt-1.5 leading-snug">
+                  {/* Title */}
+                  <h3 className="font-extrabold text-slate-900 text-sm leading-snug">
                     {notif.title}
                   </h3>
 
-                  <div className="text-xs text-slate-600 mt-2 space-y-2 leading-relaxed whitespace-pre-line">
+                  {/* Message Content */}
+                  <div className="text-xs font-semibold text-slate-700 mt-1.5 p-2.5 bg-white/80 rounded-xl border border-slate-200/70 leading-relaxed whitespace-pre-line">
                     {notif.message}
                   </div>
 
+                  {/* Action Button for Trip Adjustments */}
                   {notif.type === 'TRIP_ADJUSTMENT' && notif.relatedEntityId && isUnread && (
-                    <div className="mt-3.5 pt-3.5 border-t border-blue-100 flex justify-end">
+                    <div className="mt-3 pt-3 border-t border-blue-200/60 flex justify-end">
                       <button
                         disabled={ackLoading === notif.id}
                         onClick={() => handleAcknowledge(notif.relatedEntityId!, notif.id)}
-                        className="bg-blue-900 hover:bg-blue-800 text-white text-xs px-4 py-2 rounded-lg font-bold shadow-sm transition-colors"
+                        className="w-full bg-blue-900 hover:bg-blue-800 text-white text-xs py-2.5 px-4 rounded-xl font-black shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-98"
                       >
-                        {ackLoading === notif.id ? t('common.loading') : t('driver.acknowledgeBtn')}
+                        <span>✓</span>
+                        <span>{ackLoading === notif.id ? t('common.loading') : `${t('driver.acknowledgeBtn')} (Got it)`}</span>
                       </button>
                     </div>
                   )}
