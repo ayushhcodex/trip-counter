@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { LanguageSelector } from '@/components/LanguageSelector';
+import LanguageSelector from '@/components/LanguageSelector';
+import SiteLoader from '@/components/SiteLoader';
 
 interface User {
   id: string;
@@ -52,18 +53,33 @@ interface AuditLog {
   actorUsername: string | null;
 }
 
+interface SuperAdminCache {
+  usersList: User[];
+  vehiclesList: Vehicle[];
+  driverAssignments: DriverAssignment[];
+  adminAssignments: AdminAssignment[];
+  auditLogsList: AuditLog[];
+}
+
+// In-memory cache for zero-delay tab switching
+let cachedSuperAdminData: SuperAdminCache | null = null;
+
 export default function SuperAdminDashboard() {
   const router = useRouter();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'vehicles' | 'users' | 'assignments' | 'audits'>('vehicles');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !cachedSuperAdminData);
 
-  // Data states
-  const [usersList, setUsersList] = useState<User[]>([]);
-  const [vehiclesList, setVehiclesList] = useState<Vehicle[]>([]);
-  const [driverAssignments, setDriverAssignments] = useState<DriverAssignment[]>([]);
-  const [adminAssignments, setAdminAssignments] = useState<AdminAssignment[]>([]);
-  const [auditLogsList, setAuditLogsList] = useState<AuditLog[]>([]);
+  // Data states initialized from cache for instant 0ms rendering
+  const [usersList, setUsersList] = useState<User[]>(() => cachedSuperAdminData?.usersList || []);
+  const [vehiclesList, setVehiclesList] = useState<Vehicle[]>(() => cachedSuperAdminData?.vehiclesList || []);
+  const [driverAssignments, setDriverAssignments] = useState<DriverAssignment[]>(() => cachedSuperAdminData?.driverAssignments || []);
+  const [adminAssignments, setAdminAssignments] = useState<AdminAssignment[]>(() => cachedSuperAdminData?.adminAssignments || []);
+  const [auditLogsList, setAuditLogsList] = useState<AuditLog[]>(() => cachedSuperAdminData?.auditLogsList || []);
+
+  // Filter & Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
 
   // Form states
   const [errorMsg, setErrorMsg] = useState('');
@@ -105,37 +121,48 @@ export default function SuperAdminDashboard() {
   };
 
   const loadAllData = async () => {
-    setLoading(true);
     setErrorMsg('');
     try {
-      // Fetch users
-      const usersRes = await fetch('/api/superadmin/users');
-      if (!usersRes.ok) {
+      // Parallel execution for maximum performance
+      const [usersRes, vehiclesRes, driverAssignRes, adminAssignRes, auditRes] = await Promise.all([
+        fetch('/api/superadmin/users'),
+        fetch('/api/superadmin/vehicles'),
+        fetch('/api/superadmin/assignments/driver'),
+        fetch('/api/superadmin/assignments/admin'),
+        fetch('/api/superadmin/audit-logs'),
+      ]);
+
+      if (usersRes.status === 401) {
         router.push('/login');
         return;
       }
-      const usersData = await usersRes.json();
-      setUsersList(usersData.users || []);
 
-      // Fetch vehicles
-      const vehiclesRes = await fetch('/api/superadmin/vehicles');
-      const vehiclesData = await vehiclesRes.json();
-      setVehiclesList(vehiclesData.vehicles || []);
+      const usersData = usersRes.ok ? await usersRes.json() : { users: [] };
+      const vehiclesData = vehiclesRes.ok ? await vehiclesRes.json() : { vehicles: [] };
+      const driverAssignData = driverAssignRes.ok ? await driverAssignRes.json() : { assignments: [] };
+      const adminAssignData = adminAssignRes.ok ? await adminAssignRes.json() : { assignments: [] };
+      const auditData = auditRes.ok ? await auditRes.json() : { logs: [] };
 
-      // Fetch driver assignments
-      const driverAssignRes = await fetch('/api/superadmin/assignments/driver');
-      const driverAssignData = await driverAssignRes.json();
-      setDriverAssignments(driverAssignData.assignments || []);
+      const newUsers = usersData.users || [];
+      const newVehicles = vehiclesData.vehicles || [];
+      const newDriverAssignments = driverAssignData.assignments || [];
+      const newAdminAssignments = adminAssignData.assignments || [];
+      const newAuditLogs = auditData.logs || [];
 
-      // Fetch admin assignments
-      const adminAssignRes = await fetch('/api/superadmin/assignments/admin');
-      const adminAssignData = await adminAssignRes.json();
-      setAdminAssignments(adminAssignData.assignments || []);
+      setUsersList(newUsers);
+      setVehiclesList(newVehicles);
+      setDriverAssignments(newDriverAssignments);
+      setAdminAssignments(newAdminAssignments);
+      setAuditLogsList(newAuditLogs);
 
-      // Fetch audit logs
-      const auditRes = await fetch('/api/superadmin/audit-logs');
-      const auditData = await auditRes.json();
-      setAuditLogsList(auditData.logs || []);
+      // Cache data for instant tab switching
+      cachedSuperAdminData = {
+        usersList: newUsers,
+        vehiclesList: newVehicles,
+        driverAssignments: newDriverAssignments,
+        adminAssignments: newAdminAssignments,
+        auditLogsList: newAuditLogs,
+      };
     } catch (error) {
       console.error('Failed to load superadmin data:', error);
       setErrorMsg('Failed to sync management database.');
@@ -146,7 +173,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     loadAllData();
-  }, [activeTab]);
+  }, []);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -185,8 +212,7 @@ export default function SuperAdminDashboard() {
       }
 
       if (res.ok) {
-        setSuccessMsg(editingUserId ? 'User updated successfully.' : 'User created successfully.');
-        // Reset form
+        setSuccessMsg(editingUserId ? 'User profile updated.' : 'New user created successfully.');
         setUserName('');
         setUserUsername('');
         setUserPhone('');
@@ -209,7 +235,7 @@ export default function SuperAdminDashboard() {
     setUserPhone(u.phone || '');
     setUserRole(u.role);
     setUserStatus(u.status);
-    setUserPassword(''); // blank unless changing
+    setUserPassword('');
   };
 
   // --- VEHICLE HANDLERS ---
@@ -240,7 +266,7 @@ export default function SuperAdminDashboard() {
       }
 
       if (res.ok) {
-        setSuccessMsg(editingVehicleId ? 'Vehicle updated successfully.' : 'Vehicle created successfully.');
+        setSuccessMsg(editingVehicleId ? 'Vehicle record updated.' : 'Vehicle added to fleet.');
         setVehicleNumber('');
         setEditingVehicleId(null);
         await loadAllData();
@@ -259,6 +285,24 @@ export default function SuperAdminDashboard() {
     setVehicleStatus(v.status);
   };
 
+  // Quick Status Toggle for Vehicles
+  const toggleVehicleStatus = async (vehicleId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'ACTIVE' ? 'BREAKDOWN' : currentStatus === 'BREAKDOWN' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      const res = await fetch(`/api/superadmin/vehicles/${vehicleId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        setSuccessMsg(`Vehicle status changed to ${nextStatus}.`);
+        await loadAllData();
+      }
+    } catch (e) {
+      setErrorMsg('Failed to update status.');
+    }
+  };
+
   // --- ASSIGNMENT HANDLERS ---
   const handleDriverAssign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,7 +315,7 @@ export default function SuperAdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vehicleId: assignVehicleId,
-          driverId: assignDriverId || null, // allow unassign
+          driverId: assignDriverId || null,
           slot: assignSlot,
         }),
       });
@@ -294,7 +338,7 @@ export default function SuperAdminDashboard() {
     setSuccessMsg('');
 
     if (!assignAdminId) {
-      setErrorMsg('Please select a System Admin.');
+      setErrorMsg('Please select a Supervisor or Admin.');
       return;
     }
 
@@ -309,11 +353,11 @@ export default function SuperAdminDashboard() {
       });
 
       if (res.ok) {
-        setSuccessMsg('Admin vehicle mappings updated successfully.');
+        setSuccessMsg('Supervisor vehicle mapping updated.');
         await loadAllData();
       } else {
         const err = await res.json();
-        setErrorMsg(err.error || 'Failed to update Admin vehicle mappings.');
+        setErrorMsg(err.error || 'Failed to update mapping.');
       }
     } catch (err) {
       setErrorMsg('Network error.');
@@ -332,7 +376,7 @@ export default function SuperAdminDashboard() {
       });
 
       if (res.ok) {
-        setSuccessMsg('Admin vehicle mapping removed.');
+        setSuccessMsg('Supervisor vehicle mapping removed.');
         await loadAllData();
       } else {
         const err = await res.json();
@@ -343,107 +387,156 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // Filtered Lists for Easy Searching
+  const filteredVehicles = vehiclesList.filter((v) =>
+    v.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredUsers = usersList.filter((u) => {
+    const matchesSearch =
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.usernameOrEmail.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-100 text-slate-800">
-      {/* Header */}
-      <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-md">
-        <div>
-          <h1 className="font-extrabold text-xl tracking-tight text-blue-400">{t('superadmin.consoleTitle')}</h1>
-          <p className="text-xs text-slate-400 font-semibold">{t('superadmin.consoleSubtitle')}</p>
+      {/* Super Admin Control Header */}
+      <header className="bg-slate-900 text-white px-4 sm:px-6 py-4 flex items-center justify-between shadow-md sticky top-0 z-20">
+        <div className="flex items-center space-x-3">
+          <div className="bg-blue-600 text-white p-2 rounded-xl text-xl">⚡</div>
+          <div>
+            <h1 className="font-black text-lg sm:text-xl tracking-tight text-blue-400">
+              Super Admin Control
+            </h1>
+            <p className="text-[11px] text-slate-400 font-semibold">
+              Fleet Management & Supervisor Access Panel
+            </p>
+          </div>
         </div>
         <div className="flex items-center space-x-3">
           <LanguageSelector variant="header" />
           <button
             onClick={handleLogout}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-xl font-bold border border-slate-700 transition-all"
           >
             {t('common.logout')}
           </button>
         </div>
       </header>
 
-      {/* Tabs */}
-      <section className="bg-white border-b border-slate-200 px-6 py-2 shadow-sm">
-        <div className="flex space-x-4">
+      {/* 4 Prominent High-Contrast Control Tabs at Top */}
+      <section className="bg-white border-b border-slate-200 px-4 sm:px-6 sticky top-[68px] z-10 shadow-sm">
+        <div className="grid grid-cols-4 gap-1 sm:gap-4 max-w-7xl mx-auto py-2">
           {[
-            { id: 'vehicles', label: t('nav.vehicles') },
-            { id: 'users', label: t('nav.users') },
-            { id: 'assignments', label: t('nav.assignments') },
-            { id: 'audits', label: t('nav.auditLogs') },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'vehicles' | 'users' | 'assignments' | 'audits')}
-              className={`py-3.5 px-1.5 border-b-2 text-xs font-bold uppercase tracking-wider transition-all focus:outline-none ${
-                activeTab === tab.id
-                  ? 'border-blue-900 text-blue-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'vehicles', label: 'Fleet Vehicles', icon: '🚛', count: vehiclesList.length },
+            { id: 'users', label: 'Users & Staff', icon: '👥', count: usersList.length },
+            { id: 'assignments', label: 'Assignments', icon: '🔗', count: driverAssignments.length + adminAssignments.length },
+            { id: 'audits', label: 'Audit Logs', icon: '📜', count: auditLogsList.length },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setSearchTerm('');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`py-3 px-2 rounded-xl font-black text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all border ${
+                  isActive
+                    ? 'bg-blue-900 text-white border-blue-950 shadow-md ring-2 ring-blue-300'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                <span className="text-lg">{tab.icon}</span>
+                <span className="truncate">{tab.label}</span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    isActive ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* Main Grid */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
         {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold mb-6 text-center">
+          <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 px-4 py-2.5 rounded-2xl text-xs font-bold mb-4 text-center shadow-xs">
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div className="bg-emerald-100 border border-emerald-300 text-emerald-700 px-4 py-2.5 rounded-lg text-xs font-semibold mb-6 text-center">
-            {successMsg}
+          <div className="bg-emerald-50 border-2 border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-2xl text-xs font-bold mb-4 text-center shadow-xs">
+            ✓ {successMsg}
           </div>
         )}
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
-            <div className="w-8 h-8 border-4 border-blue-900 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-3 text-slate-500 text-xs font-semibold">{t('common.loading')}</p>
+          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <SiteLoader />
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Panel: Content Lists */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* --- TAB: VEHICLES --- */}
-              {activeTab === 'vehicles' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.allVehicles')}</h3>
+          <div className="space-y-6">
+            {/* --- TAB 1: FLEET VEHICLES --- */}
+            {activeTab === 'vehicles' && (
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Left 2 Cols: Vehicles List */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                      <span>🚛</span> All Registered Fleet Vehicles ({filteredVehicles.length})
+                    </h3>
+                    <input
+                      type="text"
+                      placeholder="Search Vehicle No..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold uppercase w-44"
+                    />
+                  </div>
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                          <th className="pb-2">{t('superadmin.vehicleNumber')}</th>
-                          <th className="pb-2">{t('common.status')}</th>
-                          <th className="pb-2 text-right">{t('common.actions')}</th>
+                          <th className="pb-2.5">Vehicle Number</th>
+                          <th className="pb-2.5">Status</th>
+                          <th className="pb-2.5 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {vehiclesList.map((v) => (
+                        {filteredVehicles.map((v) => (
                           <tr key={v.id} className="hover:bg-slate-50">
-                            <td className="py-3 font-bold uppercase text-slate-700">{v.vehicleNumber}</td>
+                            <td className="py-3 font-black uppercase text-slate-900 text-sm">{v.vehicleNumber}</td>
                             <td className="py-3">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              <button
+                                onClick={() => toggleVehicleStatus(v.id, v.status)}
+                                title="Click to toggle vehicle status"
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer ${
                                   v.status === 'ACTIVE'
-                                    ? 'bg-emerald-100 text-emerald-700'
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200'
                                     : v.status === 'BREAKDOWN'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-slate-100 text-slate-600'
+                                    ? 'bg-amber-100 text-amber-950 border-amber-300 hover:bg-amber-200 animate-pulse'
+                                    : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
                                 }`}
                               >
-                                {v.status === 'ACTIVE' ? t('common.active') : v.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
-                              </span>
+                                {v.status}
+                              </button>
                             </td>
                             <td className="py-3 text-right">
                               <button
                                 onClick={() => startEditVehicle(v)}
-                                className="text-blue-900 hover:text-blue-800 font-bold"
+                                className="bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-extrabold px-3 py-1 rounded-lg text-xs"
                               >
-                                {t('common.edit')}
+                                Edit
                               </button>
                             </td>
                           </tr>
@@ -452,62 +545,147 @@ export default function SuperAdminDashboard() {
                     </table>
                   </div>
                 </div>
-              )}
 
-              {/* --- TAB: USERS --- */}
-              {activeTab === 'users' && (
+                {/* Right Col: Add / Edit Vehicle Form */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.allUsers')}</h3>
+                  <h3 className="font-black text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span>➕</span> {editingVehicleId ? 'Edit Vehicle Status' : 'Add New Vehicle'}
+                  </h3>
+                  <form onSubmit={handleVehicleSubmit} className="space-y-3 text-xs">
+                    <div>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">Vehicle Reg Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. KA-01-AB-1234"
+                        value={vehicleNumber}
+                        onChange={(e) => setVehicleNumber(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 uppercase font-bold text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">Vehicle Status</label>
+                      <select
+                        value={vehicleStatus}
+                        onChange={(e) => setVehicleStatus(e.target.value as any)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-extrabold text-slate-900"
+                      >
+                        <option value="ACTIVE">ACTIVE (Running)</option>
+                        <option value="BREAKDOWN">BREAKDOWN (Under Repair)</option>
+                        <option value="INACTIVE">INACTIVE (Off-duty)</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-xl py-2.5 font-bold uppercase shadow-sm"
+                      >
+                        {editingVehicleId ? 'Update Vehicle' : 'Save Vehicle'}
+                      </button>
+                      {editingVehicleId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingVehicleId(null);
+                            setVehicleNumber('');
+                          }}
+                          className="bg-slate-200 text-slate-700 rounded-xl px-4 py-2.5 font-bold uppercase"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* --- TAB 2: USERS & STAFF --- */}
+            {activeTab === 'users' && (
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Left 2 Cols: User Roster */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                      <span>👥</span> Staff & Driver Accounts ({filteredUsers.length})
+                    </h3>
+                    <input
+                      type="text"
+                      placeholder="Search Driver/User Name..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold w-48"
+                    />
+                  </div>
+
+                  {/* Role Filter Chips */}
+                  <div className="flex gap-1.5 pt-1">
+                    {['ALL', 'DRIVER', 'SUPERVISOR', 'ADMIN', 'SUPER_ADMIN'].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRoleFilter(r)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${
+                          roleFilter === r
+                            ? 'bg-blue-900 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                          <th className="pb-2">{t('superadmin.fullName')}</th>
-                          <th className="pb-2">{t('superadmin.driverIdOrUsername')}</th>
-                          <th className="pb-2">{t('superadmin.systemRole')}</th>
-                          <th className="pb-2">{t('common.status')}</th>
-                          <th className="pb-2 text-right">{t('common.actions')}</th>
+                          <th className="pb-2">Full Name</th>
+                          <th className="pb-2">User ID</th>
+                          <th className="pb-2">Role</th>
+                          <th className="pb-2">Status</th>
+                          <th className="pb-2 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {usersList.map((u) => (
+                        {filteredUsers.map((u) => (
                           <tr key={u.id} className="hover:bg-slate-50">
-                            <td className="py-3 font-bold text-slate-700">{u.name}</td>
-                            <td className="py-3 font-medium text-slate-500">{u.usernameOrEmail}</td>
+                            <td className="py-3 font-bold text-slate-900">{u.name}</td>
+                            <td className="py-3 font-semibold text-slate-600">{u.usernameOrEmail}</td>
                             <td className="py-3">
                               <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase ${
                                   u.role === 'SUPERVISOR'
-                                    ? 'bg-amber-100 text-amber-700'
+                                    ? 'bg-amber-100 text-amber-950 border border-amber-300'
                                     : u.role === 'SUPER_ADMIN'
-                                    ? 'bg-purple-100 text-purple-700'
+                                    ? 'bg-purple-100 text-purple-900 border border-purple-300'
                                     : u.role === 'ADMIN'
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : 'bg-slate-100 text-slate-600'
+                                    ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                    : 'bg-slate-100 text-slate-800 border border-slate-300'
                                 }`}
                               >
-                                {u.role === 'DRIVER' ? t('common.driverRole') : u.role === 'SUPER_ADMIN' ? t('common.superAdminRole') : t('common.adminRole')}
+                                {u.role}
                               </span>
                             </td>
                             <td className="py-3">
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                   u.status === 'ACTIVE'
-                                    ? 'bg-emerald-100 text-emerald-700'
+                                    ? 'bg-emerald-100 text-emerald-800'
                                     : u.status === 'LEAVE'
-                                    ? 'bg-amber-100 text-amber-700'
+                                    ? 'bg-amber-100 text-amber-800'
                                     : 'bg-slate-100 text-slate-600'
                                 }`}
                               >
-                                {u.status === 'ACTIVE' ? t('common.active') : u.status === 'LEAVE' ? t('common.leave') : t('common.inactive')}
+                                {u.status}
                               </span>
                             </td>
                             <td className="py-3 text-right">
                               <button
                                 onClick={() => startEditUser(u)}
-                                className="text-blue-900 hover:text-blue-800 font-bold"
+                                className="bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-extrabold px-3 py-1 rounded-lg text-xs"
                               >
-                                {t('common.edit')}
+                                Edit
                               </button>
                             </td>
                           </tr>
@@ -516,192 +694,89 @@ export default function SuperAdminDashboard() {
                     </table>
                   </div>
                 </div>
-              )}
 
-              {/* --- TAB: ASSIGNMENTS --- */}
-              {activeTab === 'assignments' && (
-                <div className="space-y-6">
-                  {/* Driver Assignments */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.driverAssignments')}</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                            <th className="pb-2">{t('diesel.vehicleLabel')}</th>
-                            <th className="pb-2">{t('superadmin.driver')}</th>
-                            <th className="pb-2">{t('superadmin.vehicleSlot')}</th>
-                            <th className="pb-2">{t('common.date')}</th>
-                            <th className="pb-2">{t('common.status')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {driverAssignments.map((a) => (
-                            <tr key={a.id} className="hover:bg-slate-50">
-                              <td className="py-3 font-bold uppercase text-slate-700">{a.vehicleNumber}</td>
-                              <td className="py-3 font-semibold text-slate-600">{a.driverName} ({a.driverUsername})</td>
-                              <td className="py-3 font-medium">{a.slot === 1 ? t('common.slot1') : t('common.slot2')}</td>
-                              <td className="py-3 text-slate-400">{new Date(a.startAt).toLocaleDateString()}</td>
-                              <td className="py-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                    a.endAt ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'
-                                  }`}
-                                >
-                                  {a.endAt ? t('common.inactive') : t('common.active')}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Admin & Supervisor Assignments */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.adminMappings')}</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-400 uppercase font-black">
-                            <th className="pb-2">{t('superadmin.adminUser')}</th>
-                            <th className="pb-2">{t('superadmin.vehicleNumber')}</th>
-                            <th className="pb-2 text-right">{t('common.actions')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {adminAssignments.map((a) => (
-                            <tr key={a.id} className="hover:bg-slate-50">
-                              <td className="py-3 font-semibold text-slate-700">{a.adminName}</td>
-                              <td className="py-3 uppercase font-bold text-blue-900">{a.vehicleNumber}</td>
-                              <td className="py-3 text-right">
-                                <button
-                                  onClick={() => handleAdminRemove(a.adminId, a.vehicleId)}
-                                  className="text-red-600 hover:text-red-700 font-bold"
-                                >
-                                  {t('common.remove')}
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* --- TAB: AUDITS --- */}
-              {activeTab === 'audits' && (
+                {/* Right Col: Add / Edit User Form */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.systemAuditTrail')}</h3>
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                    {auditLogsList.map((log) => (
-                      <div key={log.id} className="border border-slate-100 bg-slate-50 rounded-lg p-3 text-xs space-y-1">
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded uppercase font-bold">{log.action}</span>
-                          <span>{new Date(log.createdAt).toLocaleString()}</span>
-                        </div>
-                        <p className="font-bold text-slate-700 mt-1">
-                          {t('superadmin.actor')}: {log.actorName || 'System'} ({log.actorUsername || 'system'})
-                        </p>
-                        <p className="text-slate-500">
-                          {t('superadmin.entity')}: {log.entityType} ({log.entityId || 'N/A'})
-                        </p>
-                        {log.metadata && (
-                          <pre className="bg-white p-2 rounded border border-slate-200 text-[10px] text-slate-600 overflow-x-auto mt-1">
-                            {JSON.stringify(log.metadata, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Panel: Creation Forms (Context-dependent) */}
-            <div className="space-y-6">
-              {/* USER CREATION / EDITING FORM */}
-              {activeTab === 'users' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">
-                    {editingUserId ? t('superadmin.editUserProfile') : t('superadmin.registerUser')}
+                  <h3 className="font-black text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span>➕</span> {editingUserId ? 'Edit User Profile' : 'Register New User'}
                   </h3>
-                  <form onSubmit={handleUserSubmit} className="space-y-3.5 text-xs">
+                  <form onSubmit={handleUserSubmit} className="space-y-3 text-xs">
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.fullName')}</label>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">Full Name</label>
                       <input
                         type="text"
+                        placeholder="e.g. Ramesh Kumar"
                         value={userName}
                         onChange={(e) => setUserName(e.target.value)}
                         required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.driverIdOrUsername')}</label>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">User ID / Username</label>
                       <input
                         type="text"
+                        placeholder="e.g. drv001"
                         value={userUsername}
                         onChange={(e) => setUserUsername(e.target.value)}
                         required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.phoneNumber')}</label>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">Phone Number (Optional)</label>
                       <input
                         type="text"
+                        placeholder="e.g. +91 98765 43210"
                         value={userPhone}
                         onChange={(e) => setUserPhone(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">
-                        {editingUserId ? t('superadmin.passwordLeaveBlank') : 'Password'}
+                      <label className="block font-bold uppercase text-slate-500 mb-1">
+                        {editingUserId ? 'New Password (Optional)' : 'Password'}
                       </label>
                       <input
                         type="password"
+                        placeholder="••••••••"
                         value={userPassword}
                         onChange={(e) => setUserPassword(e.target.value)}
                         required={!editingUserId}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.systemRole')}</label>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">System Role</label>
                       <select
                         value={userRole}
-                        onChange={(e) => setUserRole(e.target.value as 'SUPER_ADMIN' | 'SUPERVISOR' | 'ADMIN' | 'DRIVER')}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        onChange={(e) => setUserRole(e.target.value as any)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-extrabold text-slate-900"
                       >
-                        <option value="DRIVER">{t('common.driverRole')}</option>
-                        <option value="ADMIN">{t('common.adminRole')}</option>
-                        <option value="SUPERVISOR">Supervisor</option>
-                        <option value="SUPER_ADMIN">{t('common.superAdminRole')}</option>
+                        <option value="DRIVER">DRIVER</option>
+                        <option value="SUPERVISOR">SUPERVISOR</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.availabilityStatus')}</label>
+                      <label className="block font-bold uppercase text-slate-500 mb-1">Status</label>
                       <select
                         value={userStatus}
-                        onChange={(e) => setUserStatus(e.target.value as 'ACTIVE' | 'LEAVE' | 'INACTIVE')}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
+                        onChange={(e) => setUserStatus(e.target.value as any)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-900"
                       >
-                        <option value="ACTIVE">{t('common.active')}</option>
-                        <option value="LEAVE">{t('common.leave')}</option>
-                        <option value="INACTIVE">{t('common.inactive')}</option>
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="LEAVE">LEAVE</option>
+                        <option value="INACTIVE">INACTIVE</option>
                       </select>
                     </div>
                     <div className="flex gap-2 pt-2">
                       <button
                         type="submit"
-                        className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow"
+                        className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-xl py-2.5 font-bold uppercase shadow-sm"
                       >
-                        {t('superadmin.saveUser')}
+                        {editingUserId ? 'Update User' : 'Save User'}
                       </button>
                       {editingUserId && (
                         <button
@@ -713,135 +788,135 @@ export default function SuperAdminDashboard() {
                             setUserPhone('');
                             setUserPassword('');
                           }}
-                          className="bg-slate-200 text-slate-600 rounded-lg px-4 py-2.5 font-bold uppercase"
+                          className="bg-slate-200 text-slate-700 rounded-xl px-4 py-2.5 font-bold uppercase"
                         >
-                          {t('common.cancel')}
+                          Cancel
                         </button>
                       )}
                     </div>
                   </form>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* VEHICLE CREATION / EDITING FORM */}
-              {activeTab === 'vehicles' && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">
-                    {editingVehicleId ? t('superadmin.editVehicleStatus') : t('superadmin.addVehicle')}
-                  </h3>
-                  <form onSubmit={handleVehicleSubmit} className="space-y-3.5 text-xs">
-                    <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.vehicleRegNumber')}</label>
-                      <input
-                        type="text"
-                        value={vehicleNumber}
-                        onChange={(e) => setVehicleNumber(e.target.value)}
-                        required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 uppercase"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.breakdownStatus')}</label>
-                      <select
-                        value={vehicleStatus}
-                        onChange={(e) => setVehicleStatus(e.target.value as 'ACTIVE' | 'BREAKDOWN' | 'INACTIVE')}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"
-                      >
-                        <option value="ACTIVE">{t('common.active')}</option>
-                        <option value="BREAKDOWN">{t('common.breakdown')}</option>
-                        <option value="INACTIVE">{t('common.inactive')}</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        type="submit"
-                        className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow"
-                      >
-                        {t('superadmin.saveVehicle')}
-                      </button>
-                      {editingVehicleId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingVehicleId(null);
-                            setVehicleNumber('');
-                          }}
-                          className="bg-slate-200 text-slate-600 rounded-lg px-4 py-2.5 font-bold uppercase"
-                        >
-                          {t('common.cancel')}
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                </div>
-              )}
+            {/* --- TAB 3: ASSIGNMENTS CONTROL --- */}
+            {activeTab === 'assignments' && (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Driver-to-Vehicle Slot Assignments */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-black text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <span>🚛</span> Assign Driver to Vehicle Slot
+                    </h3>
 
-              {/* DRIVER AND ADMIN ASSIGNMENTS FORM PANEL */}
-              {activeTab === 'assignments' && (
-                <div className="space-y-6">
-                  {/* Assign Driver to Vehicle */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.assignDriverSlot')}</h3>
-                    <form onSubmit={handleDriverAssign} className="space-y-3.5 text-xs">
+                    <form onSubmit={handleDriverAssign} className="space-y-3.5 text-xs mt-3">
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.targetVehicle')}</label>
+                        <label className="block font-bold uppercase text-slate-500 mb-1">Target Vehicle</label>
                         <select
                           value={assignVehicleId}
                           onChange={(e) => setAssignVehicleId(e.target.value)}
                           required
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold uppercase"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-extrabold text-blue-950 uppercase"
                         >
-                          <option value="">Select {t('diesel.vehicleLabel')}</option>
+                          <option value="">Select Vehicle</option>
                           {vehiclesList.map((v) => (
-                            <option key={v.id} value={v.id}>{v.vehicleNumber} ({v.status})</option>
+                            <option key={v.id} value={v.id}>
+                              {v.vehicleNumber} ({v.status})
+                            </option>
                           ))}
                         </select>
                       </div>
+
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.driver')}</label>
+                        <label className="block font-bold uppercase text-slate-500 mb-1">Driver</label>
                         <select
                           value={assignDriverId}
                           onChange={(e) => setAssignDriverId(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-900"
                         >
-                          <option value="">{t('superadmin.unassignSlot')}</option>
+                          <option value="">-- Unassign Driver --</option>
                           {usersList
                             .filter((u) => u.role === 'DRIVER')
                             .map((u) => (
-                              <option key={u.id} value={u.id}>{u.name} ({u.usernameOrEmail} - {u.status})</option>
+                              <option key={u.id} value={u.id}>
+                                {u.name} ({u.usernameOrEmail} - {u.status})
+                              </option>
                             ))}
                         </select>
                       </div>
+
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.vehicleSlot')}</label>
-                        <select
-                          value={assignSlot}
-                          onChange={(e) => setAssignSlot(parseInt(e.target.value, 10))}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
-                        >
-                          <option value={1}>{t('common.slot1')}</option>
-                          <option value={2}>{t('common.slot2')}</option>
-                        </select>
+                        <label className="block font-bold uppercase text-slate-500 mb-1">Vehicle Shift Slot</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAssignSlot(1)}
+                            className={`py-2 rounded-xl font-black text-xs border ${
+                              assignSlot === 1
+                                ? 'bg-blue-900 text-white border-blue-950'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            Slot 1 (Day Shift)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAssignSlot(2)}
+                            className={`py-2 rounded-xl font-black text-xs border ${
+                              assignSlot === 2
+                                ? 'bg-blue-900 text-white border-blue-950'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            Slot 2 (Night Shift)
+                          </button>
+                        </div>
                       </div>
+
                       <button
                         type="submit"
-                        className="w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2"
+                        disabled={!assignVehicleId}
+                        className="w-full bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-xl py-2.5 font-extrabold uppercase shadow-sm mt-2"
                       >
-                        {t('superadmin.updateAssignment')}
+                        Save Driver Assignment
                       </button>
                     </form>
                   </div>
 
-                  {/* Assign Vehicles to Admin / Supervisor */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-400">{t('superadmin.mapAdminVehicle')}</h3>
+                  {/* Active Driver Assignments Table */}
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 mb-2">
+                      Active Driver Assignments ({driverAssignments.length})
+                    </h4>
+                    <div className="max-h-48 overflow-y-auto space-y-1.5">
+                      {driverAssignments.map((a) => (
+                        <div key={a.id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                          <div>
+                            <span className="font-black uppercase text-blue-950">{a.vehicleNumber}</span>
+                            <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-1.5 py-0.5 rounded ml-2">
+                              Slot {a.slot}
+                            </span>
+                          </div>
+                          <span className="font-bold text-slate-800">{a.driverName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Supervisor / Admin Vehicle Assignments */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h3 className="font-black text-sm uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span>👤</span> Map Supervisor / Admin to Vehicles
+                      </h3>
                       {assignAdminId && (
-                        <div className="flex items-center space-x-2 text-[11px]">
+                        <div className="flex items-center gap-2 text-[11px]">
                           <button
                             type="button"
                             onClick={() => setAssignAdminVehicleIds(vehiclesList.map((v) => v.id))}
-                            className="text-blue-600 hover:text-blue-800 font-bold"
+                            className="text-blue-700 hover:text-blue-900 font-black"
                           >
                             Select All
                           </button>
@@ -851,78 +926,132 @@ export default function SuperAdminDashboard() {
                             onClick={() => setAssignAdminVehicleIds([])}
                             className="text-slate-500 hover:text-slate-700 font-bold"
                           >
-                            Deselect All
+                            Clear
                           </button>
                         </div>
                       )}
                     </div>
-                    <form onSubmit={handleAdminAssign} className="space-y-3.5 text-xs">
+
+                    <form onSubmit={handleAdminAssign} className="space-y-3 text-xs mt-3">
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">{t('superadmin.adminUser')}</label>
+                        <label className="block font-bold uppercase text-slate-500 mb-1">Supervisor / Admin User</label>
                         <select
                           value={assignAdminId}
                           onChange={(e) => handleAdminSelect(e.target.value)}
                           required
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-semibold"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-extrabold text-slate-900"
                         >
-                          <option value="">Select {t('common.adminRole')}</option>
+                          <option value="">Select Supervisor</option>
                           {usersList
                             .filter((u) => u.role === 'ADMIN' || u.role === 'SUPERVISOR')
                             .map((u) => (
-                              <option key={u.id} value={u.id}>{u.name} ({u.usernameOrEmail} - {u.role === 'SUPERVISOR' ? 'Supervisor' : 'Admin'})</option>
+                              <option key={u.id} value={u.id}>
+                                {u.name} ({u.role})
+                              </option>
                             ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="block font-bold uppercase text-slate-400 mb-1">
-                          {t('admin.assignedToMe')} ({assignAdminVehicleIds.length})
+                        <label className="block font-bold uppercase text-slate-500 mb-1">
+                          Assigned Vehicles ({assignAdminVehicleIds.length})
                         </label>
-                        {vehiclesList.length === 0 ? (
-                          <p className="text-slate-400 italic py-2">No vehicles available.</p>
-                        ) : (
-                          <div className="max-h-52 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1.5">
-                            {vehiclesList.map((v) => {
-                              const isChecked = assignAdminVehicleIds.includes(v.id);
-                              return (
-                                <label
-                                  key={v.id}
-                                  className={`flex items-center space-x-2.5 p-2 rounded cursor-pointer transition-colors ${
-                                    isChecked ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-slate-100 text-slate-700 font-medium'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setAssignAdminVehicleIds([...assignAdminVehicleIds, v.id]);
-                                      } else {
-                                        setAssignAdminVehicleIds(assignAdminVehicleIds.filter((id) => id !== v.id));
-                                      }
-                                    }}
-                                    className="rounded border-slate-300 text-blue-900 focus:ring-blue-800 h-4 w-4"
-                                  />
-                                  <span className="uppercase text-xs tracking-wider">{v.vehicleNumber} ({v.status})</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        )}
+                        <div className="max-h-40 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1">
+                          {vehiclesList.map((v) => {
+                            const isChecked = assignAdminVehicleIds.includes(v.id);
+                            return (
+                              <label
+                                key={v.id}
+                                className={`flex items-center space-x-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
+                                  isChecked ? 'bg-blue-100 text-blue-950 font-black' : 'hover:bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAssignAdminVehicleIds([...assignAdminVehicleIds, v.id]);
+                                    } else {
+                                      setAssignAdminVehicleIds(assignAdminVehicleIds.filter((id) => id !== v.id));
+                                    }
+                                  }}
+                                  className="rounded border-slate-300 text-blue-900 focus:ring-blue-800 h-4 w-4"
+                                />
+                                <span className="uppercase text-xs tracking-wide">{v.vehicleNumber} ({v.status})</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       <button
                         type="submit"
                         disabled={!assignAdminId}
-                        className="w-full bg-blue-900 hover:bg-blue-800 disabled:bg-slate-300 text-white rounded-lg py-2.5 font-bold uppercase shadow pt-2 transition-all cursor-pointer"
+                        className="w-full bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-xl py-2.5 font-extrabold uppercase shadow-sm"
                       >
-                        {t('superadmin.mapVehicleBtn')}
+                        Save Supervisor Mapping
                       </button>
                     </form>
                   </div>
+
+                  {/* Active Admin Mappings Table */}
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 mb-2">
+                      Supervisor Vehicle Mappings ({adminAssignments.length})
+                    </h4>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {adminAssignments.map((a) => (
+                        <div key={a.id} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs flex items-center justify-between">
+                          <span className="font-bold text-slate-800">{a.adminName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black uppercase text-blue-900">{a.vehicleNumber}</span>
+                            <button
+                              onClick={() => handleAdminRemove(a.adminId, a.vehicleId)}
+                              className="text-red-600 font-bold hover:underline"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* --- TAB 4: AUDIT LOGS --- */}
+            {activeTab === 'audits' && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span>📜</span> System Audit Trail & Event Logs ({auditLogsList.length})
+                </h3>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                  {auditLogsList.map((log) => (
+                    <div key={log.id} className="border border-slate-200 bg-slate-50 rounded-xl p-3.5 text-xs space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+                        <span className="bg-blue-900 text-white px-2.5 py-0.5 rounded-full uppercase font-black">
+                          {log.action}
+                        </span>
+                        <span>📅 {new Date(log.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className="font-extrabold text-slate-900 mt-1">
+                        Actor: <span className="text-blue-900">{log.actorName || 'System'}</span> ({log.actorUsername || 'system'})
+                      </p>
+                      <p className="text-slate-600 font-semibold">
+                        Entity: {log.entityType} ({log.entityId || 'N/A'})
+                      </p>
+                      {log.metadata && (
+                        <pre className="bg-white p-2 rounded-lg border border-slate-200 text-[10px] text-slate-700 overflow-x-auto mt-1 font-mono">
+                          {JSON.stringify(log.metadata, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
