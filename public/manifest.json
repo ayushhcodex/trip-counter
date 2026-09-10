@@ -1,6 +1,6 @@
 {
-  "name": "Rentzoo Go - Trip Counter",
-  "short_name": "Rentzoo Go",
+  "name": "Tripzoo - Trip Counter",
+  "short_name": "Tripzoo",
   "description": "Mobile-first PWA for vehicle trip logging and verified counting.",
   "start_url": "/",
   "display": "standalone",

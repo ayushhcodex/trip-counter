@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rentzoo Go - Vehicle Trip Verification",
+  title: "Tripzoo - Vehicle Trip Verification",
   description: "Mobile-first PWA for vehicle trip counting and verification.",
   manifest: "/manifest.json",
   icons: {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Rentzoo Go",
+    title: "Tripzoo",
   },
 };
 

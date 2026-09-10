@@ -2,7 +2,7 @@ import { TranslationDictionary } from '../types';
 
 export const en: TranslationDictionary = {
   common: {
-    appName: 'Rentzoo Go',
+    appName: 'Tripzoo',
     tagline: 'Trip Counter & Verification',
     loading: 'Loading...',
     error: 'Error',
@@ -43,7 +43,7 @@ export const en: TranslationDictionary = {
     manageVehicles: 'Manage Vehicles →',
   },
   auth: {
-    title: 'Rentzoo Go',
+    title: 'Tripzoo',
     subtitle: 'Sign in to access your dashboard',
     usernameLabel: 'Driver ID / Username / Email',
     usernamePlaceholder: 'e.g. drv0001 or superadmin@tripcounter.org',
@@ -132,7 +132,7 @@ export const en: TranslationDictionary = {
     byAdmin: 'By',
   },
   superadmin: {
-    consoleTitle: 'Rentzoo Go Console',
+    consoleTitle: 'Tripzoo Console',
     consoleSubtitle: 'Super Admin Control Hub',
     allVehicles: 'All Vehicles',
     vehicleNumber: 'Vehicle Number',
@@ -177,7 +177,7 @@ export const en: TranslationDictionary = {
     notesLabel: 'Notes',
   },
   pwa: {
-    installTitle: 'Install Rentzoo Go',
+    installTitle: 'Install Tripzoo',
     installSubtitle: 'Fast trip logging & offline access',
     iosInstructionsTitle: 'To install this app on your iPhone:',
     iosStep1: 'Tap the Share button at the bottom of Safari:',

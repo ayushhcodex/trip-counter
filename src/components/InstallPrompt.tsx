@@ -78,7 +78,7 @@ export default function InstallPrompt() {
         <div className="flex items-center space-x-3">
           <img
             src="/icons/icon-192x192.png"
-            alt="Rentzoo Go"
+            alt="Tripzoo"
             className="w-12 h-12 rounded-xl shadow-md border border-slate-100 object-cover"
           />
           <div>

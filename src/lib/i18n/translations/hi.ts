@@ -2,7 +2,7 @@ import { TranslationDictionary } from '../types';
 
 export const hi: TranslationDictionary = {
   common: {
-    appName: 'रेंटज़ू गो',
+    appName: 'ट्रिपज़ू (Tripzoo)',
     tagline: 'ट्रिप काउंटर एवं सत्यापन',
     loading: 'लोड हो रहा है...',
     error: 'त्रुटि',
@@ -43,7 +43,7 @@ export const hi: TranslationDictionary = {
     manageVehicles: 'वाहन प्रबंधित करें →',
   },
   auth: {
-    title: 'रेंटज़ू गो (Rentzoo Go)',
+    title: 'ट्रिपज़ू (Tripzoo)',
     subtitle: 'डैशबोर्ड में जाने के लिए साइन इन करें',
     usernameLabel: 'ड्राइवर आईडी / यूजरनेम / ईमेल',
     usernamePlaceholder: 'उदा. drv0001 या superadmin@tripcounter.org',
@@ -132,7 +132,7 @@ export const hi: TranslationDictionary = {
     byAdmin: 'द्वारा (By)',
   },
   superadmin: {
-    consoleTitle: 'रेंटज़ू गो कंसोल',
+    consoleTitle: 'ट्रिपज़ू कंसोल (Tripzoo Console)',
     consoleSubtitle: 'सुपर एडमिन कंट्रोल हब',
     allVehicles: 'सभी वाहन (All Vehicles)',
     vehicleNumber: 'वाहन नंबर',
@@ -177,7 +177,7 @@ export const hi: TranslationDictionary = {
     notesLabel: 'विवरण / नोट्स',
   },
   pwa: {
-    installTitle: 'रेंटज़ू गो ऐप इंस्टॉल करें',
+    installTitle: 'ट्रिपज़ू ऐप इंस्टॉल करें (Install Tripzoo)',
     installSubtitle: 'तेज़ ट्रिप लॉगिंग और बिना इंटरनेट के काम करें',
     iosInstructionsTitle: 'iPhone पर इंस्टॉल करने का तरीका:',
     iosStep1: 'Safari ब्राउज़र में नीचे शेयर (Share) बटन दबाएं:',

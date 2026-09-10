@@ -1,10 +1,10 @@
-# TripCounter (Rentzoo Go) — Technical Project Overview, Roadmap & Scaling Architecture
+# TripCounter (Tripzoo) — Technical Project Overview, Roadmap & Scaling Architecture
 
 ---
 
 ## Executive Summary
 
-**TripCounter** is a mission-critical, offline-first fleet operations and trip accounting platform built for commercial transportation and vehicle rental networks (such as **Rentzoo Go**). 
+**TripCounter** is a mission-critical, offline-first fleet operations and trip accounting platform built for commercial transportation and vehicle rental networks (such as **Tripzoo**). 
 
 The platform addresses the operational friction in commercial fleet management:
 - **Low/Intermittent Field Connectivity**: Drivers operating in cellular dead-zones can log trips reliably without losing records.
@@ -136,7 +136,7 @@ The database schema (`src/db/schema.ts`) includes 11 specialized tables:
 
 1. **Progressive Web App (PWA) via TWA (Trusted Web Activity)**:
    - **Mechanism**: Wrap the existing Next.js PWA using **Bubblewrap / Android TWA** to publish directly to the Google Play Store as a native `.aab` / `.apk`.
-   - **Benefits**: Drivers install "Rentzoo Go" like any native app; updates deploy instantly on the web server without app store review cycles.
+   - **Benefits**: Drivers install "Tripzoo" like any native app; updates deploy instantly on the web server without app store review cycles.
 2. **Kiosk / MDM Mode for Depot Terminals**:
    - For check-in booths or tablet terminals at fueling stations, distribute via Android Enterprise / MDM locked into the TripCounter web interface.
 3. **SMS / WhatsApp Deep-Link Driver Onboarding**:

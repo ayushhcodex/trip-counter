@@ -2,7 +2,7 @@ import { TranslationDictionary } from '../types';
 
 export const gu: TranslationDictionary = {
   common: {
-    appName: 'રેન્ટઝૂ ગો',
+    appName: 'ટ્રિપઝૂ (Tripzoo)',
     tagline: 'ટ્રિપ કાઉન્ટર અને વેરિફિકેશન',
     loading: 'લોડ થઈ રહ્યું છે...',
     error: 'ભૂલ',
@@ -43,7 +43,7 @@ export const gu: TranslationDictionary = {
     manageVehicles: 'વાહનોનું સંચાલન →',
   },
   auth: {
-    title: 'રેન્ટઝૂ ગો (Rentzoo Go)',
+    title: 'ટ્રિપઝૂ (Tripzoo)',
     subtitle: 'ડેશબોર્ડ ખોલવા માટે સાઇન ઇન કરો',
     usernameLabel: 'ડ્રાઇવર આઈડી / યુઝરનેમ / ઇમેઇલ',
     usernamePlaceholder: 'દા.ત. drv0001 અથવા superadmin@tripcounter.org',
@@ -132,7 +132,7 @@ export const gu: TranslationDictionary = {
     byAdmin: 'દ્વારા (By)',
   },
   superadmin: {
-    consoleTitle: 'રેન્ટઝૂ ગો કન્સોલ',
+    consoleTitle: 'ટ્રિપઝૂ કન્સોલ (Tripzoo Console)',
     consoleSubtitle: 'સુપર એડમિન કંટ્રોલ હબ',
     allVehicles: 'બધા વાહનો (All Vehicles)',
     vehicleNumber: 'વાહન નંબર',
@@ -177,7 +177,7 @@ export const gu: TranslationDictionary = {
     notesLabel: 'વિગત / નોંધ',
   },
   pwa: {
-    installTitle: 'રેન્ટઝૂ ગો એપ ઇન્સ્ટોલ કરો',
+    installTitle: 'ટ્રિપઝૂ એપ ઇન્સ્ટોલ કરો (Install Tripzoo)',
     installSubtitle: 'ઝડપી ટ્રિપ લૉગિંગ અને ઑફલાઇન ઉપયોગ',
     iosInstructionsTitle: 'iPhone પર ઇન્સ્ટોલ કરવાની રીત:',
     iosStep1: 'Safari બ્રાઉઝરમાં નીચે શેર (Share) બટન દબાવો:',
