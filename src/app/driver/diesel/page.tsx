@@ -163,55 +163,90 @@ export default function DriverDieselPage() {
           </div>
         )}
 
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm text-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('common.today')}</span>
-            <span className="text-xl font-black text-blue-900 block mt-1">
-              {metrics.todayLitres} <span className="text-xs font-bold">L</span>
+        {/* High-Impact Visual Summary Metrics Cards */}
+        <div className="grid grid-cols-3 gap-2.5 mb-6">
+          {/* Today's Diesel Card */}
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-3.5 shadow-md flex flex-col justify-between items-center text-center border border-amber-400">
+            <div className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide opacity-90">
+              <span>⛽</span>
+              <span>{t('common.today')}</span>
+            </div>
+            <div className="my-1.5">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-xs">
+                {metrics.todayLitres}
+              </span>
+              <span className="text-xs font-black ml-1 uppercase opacity-90">L</span>
+            </div>
+            <span className="text-[10px] bg-amber-700/60 px-2 py-0.5 rounded-full font-bold">
+              {t('diesel.litres')}
             </span>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm text-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('common.thisMonth')}</span>
-            <span className="text-xl font-black text-blue-900 block mt-1">
-              {metrics.monthLitres} <span className="text-xs font-bold">L</span>
+          {/* This Month Diesel Card */}
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl p-3.5 shadow-md flex flex-col justify-between items-center text-center border border-blue-500">
+            <div className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide opacity-90">
+              <span>📅</span>
+              <span>{t('common.thisMonth')}</span>
+            </div>
+            <div className="my-1.5">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-xs">
+                {metrics.monthLitres}
+              </span>
+              <span className="text-xs font-black ml-1 uppercase opacity-90">L</span>
+            </div>
+            <span className="text-[10px] bg-blue-800/60 px-2 py-0.5 rounded-full font-bold">
+              {t('diesel.litres')}
             </span>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm text-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">{t('common.total')}</span>
-            <span className="text-xl font-black text-emerald-700 block mt-1">
-              {metrics.totalLitres} <span className="text-xs font-bold">L</span>
+          {/* Total Diesel Card */}
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl p-3.5 shadow-md flex flex-col justify-between items-center text-center border border-emerald-500">
+            <div className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide opacity-90">
+              <span>📊</span>
+              <span>{t('common.total')}</span>
+            </div>
+            <div className="my-1.5">
+              <span className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-xs">
+                {metrics.totalLitres}
+              </span>
+              <span className="text-xs font-black ml-1 uppercase opacity-90">L</span>
+            </div>
+            <span className="text-[10px] bg-emerald-800/60 px-2 py-0.5 rounded-full font-bold">
+              {t('diesel.litres')}
             </span>
           </div>
         </div>
 
-        {/* Diesel Entries List */}
+        {/* Diesel Log Entries List */}
         <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs uppercase font-bold tracking-wider text-slate-400 text-left">
-              {t('diesel.loggedFuelFillings')}
-            </h3>
+          <div className="flex items-center justify-between mb-3 bg-slate-200/60 p-2 rounded-xl border border-slate-300/70">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⛽</span>
+              <h3 className="text-xs uppercase font-black tracking-wider text-slate-700">
+                {t('diesel.loggedFuelFillings')}
+              </h3>
+            </div>
             <button
               onClick={() => loadDieselData()}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+              className="bg-white hover:bg-slate-50 text-blue-900 border border-slate-300 font-extrabold px-3 py-1 rounded-lg text-xs flex items-center gap-1 shadow-2xs transition-all active:scale-95"
             >
-              ↻ {t('common.refresh')}
+              <span>↻</span>
+              <span>{t('common.refresh')}</span>
             </button>
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
-              <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-3 text-slate-500 text-xs font-semibold">{t('common.loading')}</p>
+            <div className="flex flex-col items-center justify-center p-12 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-3 text-slate-600 text-xs font-bold uppercase tracking-wider">{t('common.loading')}</p>
             </div>
           ) : entries.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs text-slate-400 shadow-sm font-semibold">
-              {t('diesel.noDieselEntries')}
+            <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 shadow-sm font-bold flex flex-col items-center gap-2">
+              <span className="text-4xl">⛽</span>
+              <span>{t('diesel.noDieselEntries')}</span>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {entries.map((entry) => {
                 const d = new Date(entry.date + 'T00:00:00');
                 const locale = language === 'hi' ? 'hi-IN' : language === 'gu' ? 'gu-IN' : 'en-US';
@@ -221,31 +256,60 @@ export default function DriverDieselPage() {
                   month: 'short',
                   day: 'numeric',
                 });
+
+                const todayStr = new Date().toISOString().split('T')[0];
+                const isToday = entry.date === todayStr;
+
                 return (
                   <div
                     key={entry.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2"
+                    className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3 hover:shadow-md transition-shadow"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-slate-800 text-sm">
-                        {formattedDate}
-                      </span>
-                      <span className="bg-blue-100 text-blue-900 text-xs px-2.5 py-1 rounded-full font-black">
-                        {parseFloat(entry.litres || '0').toFixed(2)} {t('diesel.litres')}
-                      </span>
+                    {/* Big Diesel Litres Pill Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-slate-100 text-slate-700 font-extrabold px-2.5 py-1 rounded-lg border border-slate-200">
+                          📅 {isToday ? 'Today' : formattedDate}
+                        </span>
+                      </div>
+                      <div className="bg-amber-100 border-2 border-amber-300 text-amber-950 px-3.5 py-1 rounded-xl flex items-center gap-1.5 shadow-2xs">
+                        <span className="text-base">⛽</span>
+                        <span className="text-lg font-black tracking-tight">
+                          {parseFloat(entry.litres || '0').toFixed(0)}
+                        </span>
+                        <span className="text-xs font-black uppercase text-amber-900">Litres</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>
-                        {t('diesel.vehicleLabel')}: <strong className="uppercase text-slate-800">{entry.vehicleNumber || 'Unassigned'}</strong>
-                      </span>
-                      <span>{t('diesel.recordedBy')}: {entry.adminName}</span>
+                    {/* Details: Vehicle & Recorded By */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex items-center gap-2">
+                        <span className="text-lg">🚛</span>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">{t('diesel.vehicleLabel')}</span>
+                          <span className="font-black text-slate-900 uppercase tracking-wide">
+                            {entry.vehicleNumber || 'Unassigned'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex items-center gap-2">
+                        <span className="text-lg">👤</span>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">{t('diesel.recordedBy')}</span>
+                          <span className="font-bold text-slate-800 truncate block">
+                            {entry.adminName}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Optional Notes */}
                     {entry.notes && (
-                      <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 italic">
-                        "{entry.notes}"
-                      </p>
+                      <div className="text-xs text-slate-700 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/70 flex items-start gap-2">
+                        <span className="text-sm">💬</span>
+                        <p className="font-semibold italic">"{entry.notes}"</p>
+                      </div>
                     )}
                   </div>
                 );
