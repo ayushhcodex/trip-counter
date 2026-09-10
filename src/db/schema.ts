@@ -37,7 +37,9 @@ export const vehicleDriverAssignments = pgTable('vehicle_driver_assignments', {
   startAt: timestamp('start_at', { withTimezone: true }).defaultNow().notNull(),
   endAt: timestamp('end_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index('idx_vda_vehicle_end').on(table.vehicleId, table.endAt),
+]);
 
 // 4. Admin Vehicle Assignments Table (Many-to-Many)
 export const adminVehicleAssignments = pgTable('admin_vehicle_assignments', {

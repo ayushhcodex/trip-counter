@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -39,9 +39,319 @@ interface VehiclesResponse {
 
 type DateRange = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
+// Memoized individual vehicle card component to isolate re-renders
+const VehicleCard = React.memo(({
+  vehicle,
+  isExpanded,
+  isSingleDay,
+  dateRangeInfo,
+  activeAdjustVehicleId,
+  adjDriverId,
+  adjType,
+  adjAmount,
+  adjReason,
+  isSubmittingAdj,
+  adjStatusMessage,
+  t,
+  onToggleExpand,
+  onVerify,
+  onToggleAdjustForm,
+  onApplyAdjustment,
+  onNavigateDiesel,
+  setAdjDriverId,
+  setAdjType,
+  setAdjAmount,
+  setAdjReason,
+  setActiveAdjustVehicleId,
+}: {
+  vehicle: Vehicle;
+  isExpanded: boolean;
+  isSingleDay: boolean;
+  dateRangeInfo: { start: string; end: string } | null;
+  activeAdjustVehicleId: string | null;
+  adjDriverId: string;
+  adjType: 'add' | 'remove';
+  adjAmount: string;
+  adjReason: string;
+  isSubmittingAdj: boolean;
+  adjStatusMessage: { type: 'success' | 'error'; text: string; vehicleId: string } | null;
+  t: (key: string) => string;
+  onToggleExpand: (id: string) => void;
+  onVerify: (id: string) => void;
+  onToggleAdjustForm: (v: Vehicle) => void;
+  onApplyAdjustment: (e: React.FormEvent, vehicleId: string) => void;
+  onNavigateDiesel: (vehicleId: string) => void;
+  setAdjDriverId: (val: string) => void;
+  setAdjType: (val: 'add' | 'remove') => void;
+  setAdjAmount: (val: string) => void;
+  setAdjReason: (val: string) => void;
+  setActiveAdjustVehicleId: (id: string | null) => void;
+}) => {
+  const driversText = [
+    vehicle.driver1?.name,
+    vehicle.driver2?.name
+  ].filter(Boolean).join(' & ') || 'Unassigned';
+
+  const statusColor = 
+    vehicle.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+    vehicle.status === 'BREAKDOWN' ? 'bg-amber-100 text-amber-800' :
+    'bg-slate-100 text-slate-800';
+
+  const formatTime = (isoString: string) => {
+    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Header (Clickable) */}
+      <div 
+        onClick={() => onToggleExpand(vehicle.id)}
+        className="p-4 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors"
+      >
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight truncate">
+              {vehicle.vehicleNumber}
+            </h2>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
+              {vehicle.status === 'ACTIVE' ? t('common.active') : vehicle.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-semibold truncate">
+            {driversText}
+          </p>
+        </div>
+        
+        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-blue-800 to-blue-950 shadow-inner flex-shrink-0 ml-3">
+          <span className="text-xl font-black text-white">{vehicle.reportedCount}</span>
+        </div>
+      </div>
+
+      {/* Accordion Content */}
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/50 pt-3">
+          
+          {/* Summary Row */}
+          <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+            <div className="text-center">
+              <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.reportedTrips')}</div>
+              <div className="text-lg font-black text-slate-800">{vehicle.reportedCount}</div>
+            </div>
+            <div className="w-px h-8 bg-slate-200"></div>
+            <div className="text-center">
+              <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.adjustmentsTotal')}</div>
+              <div className="text-lg font-black text-slate-800">{vehicle.adjustmentTotal}</div>
+            </div>
+            <div className="w-px h-8 bg-slate-200"></div>
+            <div className="text-center">
+              <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.verifiedTrips')}</div>
+              <div className="text-lg font-black text-slate-800">{vehicle.verifiedCount}</div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-2 mb-4">
+            {isSingleDay && vehicle.verificationStatus !== 'VERIFIED' && (
+              <button
+                onClick={() => onVerify(vehicle.id)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                {t('admin.verifyCountBtn')}
+              </button>
+            )}
+
+            {vehicle.verificationStatus === 'VERIFIED' && isSingleDay && (
+              <div className="w-full bg-emerald-50 text-emerald-700 py-2 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200 text-xs">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
+                {t('admin.verifiedBadge')}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onToggleAdjustForm(vehicle)}
+                className={`py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs ${
+                  activeAdjustVehicleId === vehicle.id
+                    ? 'bg-blue-900 text-white'
+                    : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200'
+                }`}
+              >
+                <span>⚡</span> {activeAdjustVehicleId === vehicle.id ? t('common.cancel') : t('admin.adjustTripCount')}
+              </button>
+
+              <button
+                onClick={() => onNavigateDiesel(vehicle.id)}
+                className="bg-slate-800 hover:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
+              >
+                <span>⛽</span> {t('diesel.pageTitle')} →
+              </button>
+            </div>
+          </div>
+
+          {/* Inline Quick Adjustment Form */}
+          {activeAdjustVehicleId === vehicle.id && (
+            <div className="mb-4 bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h4 className="font-extrabold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>⚡</span> {t('admin.adjustTripCount')}
+                </h4>
+                <span className="text-[10px] text-slate-400 font-semibold">{dateRangeInfo?.start}</span>
+              </div>
+
+              {adjStatusMessage && adjStatusMessage.vehicleId === vehicle.id && (
+                <div className={`p-2 rounded-lg text-xs font-semibold text-center ${
+                  adjStatusMessage.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
+                }`}>
+                  {adjStatusMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={(e) => onApplyAdjustment(e, vehicle.id)} className="space-y-2.5 text-xs">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.targetDriver')}</label>
+                  <select
+                    value={adjDriverId}
+                    onChange={(e) => setAdjDriverId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700 font-semibold"
+                    required
+                  >
+                    <option value="">Select Driver</option>
+                    {vehicle.driver1 && <option value={vehicle.driver1.id}>{t('common.slot1')}: {vehicle.driver1.name} ({vehicle.driver1.reportedCount} trips)</option>}
+                    {vehicle.driver2 && <option value={vehicle.driver2.id}>{t('common.slot2')}: {vehicle.driver2.name} ({vehicle.driver2.reportedCount} trips)</option>}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.adjustmentType')}</label>
+                    <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setAdjType('add')}
+                        className={`py-1 rounded text-center text-xs font-bold transition-all ${
+                          adjType === 'add' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500'
+                        }`}
+                      >
+                        {t('admin.addTrips')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdjType('remove')}
+                        className={`py-1 rounded text-center text-xs font-bold transition-all ${
+                          adjType === 'remove' ? 'bg-red-600 text-white shadow-xs' : 'text-slate-500'
+                        }`}
+                      >
+                        {t('admin.removeTrips')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.quantity')}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={adjAmount}
+                      onChange={(e) => setAdjAmount(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-bold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.reasonLabel')}</label>
+                  <input
+                    type="text"
+                    placeholder={t('admin.reasonPlaceholder')}
+                    value={adjReason}
+                    onChange={(e) => setAdjReason(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingAdj || !adjDriverId}
+                    className="flex-1 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg py-2 font-bold uppercase shadow-xs transition-all text-xs"
+                  >
+                    {isSubmittingAdj ? t('admin.adjusting') : `${t('admin.applyAdjustmentBtn')} (${adjType === 'add' ? '+' : '-'}${adjAmount || '1'})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdjustVehicleId(null)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-2 font-bold text-xs"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Driver Breakdown */}
+          <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+            <div className="flex justify-between items-center text-slate-600">
+              <span className="font-semibold text-[11px]">{t('common.slot1')}: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
+              <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} trips</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-600 border-t border-slate-50 pt-1">
+              <span className="font-semibold text-[11px]">{t('common.slot2')}: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
+              <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} trips</span>
+            </div>
+          </div>
+
+          {/* Trips List */}
+          <div>
+            <h3 className="text-xs font-bold uppercase text-slate-500 mb-2 px-1">{t('driver.historyTitle')}</h3>
+            {vehicle.trips.length === 0 ? (
+              <div className="bg-white p-4 rounded-xl border border-slate-100 text-center text-sm font-semibold text-slate-400">
+                {t('driver.noTripsLogged')}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {vehicle.trips.map((trip, idx) => (
+                  <div key={trip.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3">
+                    <div className="bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center font-black text-slate-600 text-sm flex-shrink-0">
+                      #{idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-slate-800 text-sm truncate">{trip.driverName}</span>
+                        <span className="text-xs font-semibold text-slate-500 flex-shrink-0">
+                          {formatTime(trip.completedAt)}
+                        </span>
+                      </div>
+                      <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        trip.shift.includes('1') ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                      }`}>
+                        {trip.shift}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+        </div>
+      )}
+    </div>
+  );
+});
+
+VehicleCard.displayName = 'VehicleCard';
+
 export default function AdminDashboard() {
   const router = useRouter();
   const { t } = useLanguage();
+  const [isPending, startTransition] = useTransition();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<DateRange>('today');
@@ -53,7 +363,7 @@ export default function AdminDashboard() {
   
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [, setLastUpdated] = useState<Date>(new Date());
   
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
@@ -91,7 +401,8 @@ export default function AdminDashboard() {
     const cacheKey = getCacheKey(tab, start, end);
     const cachedData = cacheRef.current[cacheKey];
 
-    if (cachedData && !isBackground) {
+    // Stale-While-Revalidate: render cached data immediately without clearing view
+    if (cachedData) {
       setVehicles(cachedData.vehicles);
       setDateRangeInfo(cachedData.dateRange);
       setIsLoading(false);
@@ -102,7 +413,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      let url = `/api/admin/vehicles?range=${tab}&_t=${Date.now()}`;
+      let url = `/api/admin/vehicles?range=${tab}`;
       if (tab === 'custom' && start && end) {
         url += `&startDate=${start}&endDate=${end}`;
       } else if (tab === 'custom') {
@@ -190,10 +501,13 @@ export default function AdminDashboard() {
     };
   }, [activeTab, customStartDate, customEndDate, fetchVehicles]);
 
+  // Non-blocking tab change using useTransition
   const handleTabChange = useCallback((tab: DateRange) => {
-    setActiveTab(tab);
-    setExpandedVehicleId(null);
-  }, []);
+    startTransition(() => {
+      setActiveTab(tab);
+      setExpandedVehicleId(null);
+    });
+  }, [startTransition]);
 
   const handleCustomFilter = useCallback(() => {
     if (customStartDate && customEndDate) {
@@ -283,15 +597,24 @@ export default function AdminDashboard() {
     router.push('/login');
   }, [router]);
 
-  const formatTime = useCallback((isoString: string) => {
-    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const onToggleExpand = useCallback((id: string) => {
+    setExpandedVehicleId(prev => (prev === id ? null : id));
   }, []);
 
-  const filteredVehicles = vehicles.filter(v => 
-    v.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.driver1?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.driver2?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const onNavigateDiesel = useCallback((id: string) => {
+    router.push(`/admin/vehicle/${id}`);
+  }, [router]);
+
+  // Memoized vehicle filter
+  const filteredVehicles = useMemo(() => {
+    if (!searchQuery.trim()) return vehicles;
+    const q = searchQuery.toLowerCase();
+    return vehicles.filter(v => 
+      v.vehicleNumber.toLowerCase().includes(q) ||
+      v.driver1?.name.toLowerCase().includes(q) ||
+      v.driver2?.name.toLowerCase().includes(q)
+    );
+  }, [vehicles, searchQuery]);
 
   const isSingleDay = activeTab === 'today' || activeTab === 'yesterday';
 
@@ -351,7 +674,7 @@ export default function AdminDashboard() {
             );
           })}
         </div>
-        {(isLoading || isRefreshing) && (
+        {(isLoading || isRefreshing || isPending) && (
           <div className="h-0.5 w-full bg-slate-100 overflow-hidden">
             <div className="h-full bg-blue-600 animate-pulse w-1/3 rounded-r-full"></div>
           </div>
@@ -418,263 +741,33 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredVehicles.map(vehicle => {
-              const isExpanded = expandedVehicleId === vehicle.id;
-              
-              const driversText = [
-                vehicle.driver1?.name,
-                vehicle.driver2?.name
-              ].filter(Boolean).join(' & ') || 'Unassigned';
-
-              const statusColor = 
-                vehicle.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
-                vehicle.status === 'BREAKDOWN' ? 'bg-amber-100 text-amber-800' :
-                'bg-slate-100 text-slate-800';
-
-              return (
-                <div key={vehicle.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  {/* Strip Header (Clickable) */}
-                  <div 
-                    onClick={() => setExpandedVehicleId(isExpanded ? null : vehicle.id)}
-                    className="p-4 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex flex-col gap-1 flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight truncate">
-                          {vehicle.vehicleNumber}
-                        </h2>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
-                          {vehicle.status === 'ACTIVE' ? t('common.active') : vehicle.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 font-semibold truncate">
-                        {driversText}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-blue-800 to-blue-950 shadow-inner flex-shrink-0 ml-3">
-                      <span className="text-xl font-black text-white">{vehicle.reportedCount}</span>
-                    </div>
-                  </div>
-
-                  {/* Accordion Content */}
-                  {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/50 pt-3">
-                      
-                      {/* Summary Row */}
-                      <div className="flex justify-between items-center mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                        <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.reportedTrips')}</div>
-                          <div className="text-lg font-black text-slate-800">{vehicle.reportedCount}</div>
-                        </div>
-                        <div className="w-px h-8 bg-slate-200"></div>
-                        <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.adjustmentsTotal')}</div>
-                          <div className="text-lg font-black text-slate-800">{vehicle.adjustmentTotal}</div>
-                        </div>
-                        <div className="w-px h-8 bg-slate-200"></div>
-                        <div className="text-center">
-                          <div className="text-[10px] uppercase font-bold text-slate-400">{t('driver.verifiedTrips')}</div>
-                          <div className="text-lg font-black text-slate-800">{vehicle.verifiedCount}</div>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-col gap-2 mb-4">
-                        {isSingleDay && vehicle.verificationStatus !== 'VERIFIED' && (
-                          <button
-                            onClick={() => handleVerify(vehicle.id)}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                            {t('admin.verifyCountBtn')}
-                          </button>
-                        )}
-
-                        {vehicle.verificationStatus === 'VERIFIED' && isSingleDay && (
-                          <div className="w-full bg-emerald-50 text-emerald-700 py-2 rounded-xl font-bold flex items-center justify-center gap-2 border border-emerald-200 text-xs">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                            {t('admin.verifiedBadge')}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => toggleAdjustForm(vehicle)}
-                            className={`py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs ${
-                              activeAdjustVehicleId === vehicle.id
-                                ? 'bg-blue-900 text-white'
-                                : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200'
-                            }`}
-                          >
-                            <span>⚡</span> {activeAdjustVehicleId === vehicle.id ? t('common.cancel') : t('admin.adjustTripCount')}
-                          </button>
-
-                          <button
-                            onClick={() => router.push(`/admin/vehicle/${vehicle.id}`)}
-                            className="bg-slate-800 hover:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
-                          >
-                            <span>⛽</span> {t('diesel.pageTitle')} →
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Inline Quick Adjustment Form */}
-                      {activeAdjustVehicleId === vehicle.id && (
-                        <div className="mb-4 bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-3">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <h4 className="font-extrabold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
-                              <span>⚡</span> {t('admin.adjustTripCount')}
-                            </h4>
-                            <span className="text-[10px] text-slate-400 font-semibold">{dateRangeInfo?.start}</span>
-                          </div>
-
-                          {adjStatusMessage && adjStatusMessage.vehicleId === vehicle.id && (
-                            <div className={`p-2 rounded-lg text-xs font-semibold text-center ${
-                              adjStatusMessage.type === 'success'
-                                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                                : 'bg-red-50 border border-red-200 text-red-700'
-                            }`}>
-                              {adjStatusMessage.text}
-                            </div>
-                          )}
-
-                          <form onSubmit={(e) => handleApplyAdjustment(e, vehicle.id)} className="space-y-2.5 text-xs">
-                            <div>
-                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.targetDriver')}</label>
-                              <select
-                                value={adjDriverId}
-                                onChange={(e) => setAdjDriverId(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700 font-semibold"
-                                required
-                              >
-                                <option value="">Select Driver</option>
-                                {vehicle.driver1 && <option value={vehicle.driver1.id}>{t('common.slot1')}: {vehicle.driver1.name} ({vehicle.driver1.reportedCount} trips)</option>}
-                                {vehicle.driver2 && <option value={vehicle.driver2.id}>{t('common.slot2')}: {vehicle.driver2.name} ({vehicle.driver2.reportedCount} trips)</option>}
-                              </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.adjustmentType')}</label>
-                                <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
-                                  <button
-                                    type="button"
-                                    onClick={() => setAdjType('add')}
-                                    className={`py-1 rounded text-center text-xs font-bold transition-all ${
-                                      adjType === 'add' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500'
-                                    }`}
-                                  >
-                                    {t('admin.addTrips')}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setAdjType('remove')}
-                                    className={`py-1 rounded text-center text-xs font-bold transition-all ${
-                                      adjType === 'remove' ? 'bg-red-600 text-white shadow-xs' : 'text-slate-500'
-                                    }`}
-                                  >
-                                    {t('admin.removeTrips')}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.quantity')}</label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="50"
-                                  value={adjAmount}
-                                  onChange={(e) => setAdjAmount(e.target.value)}
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-bold"
-                                  required
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">{t('admin.reasonLabel')}</label>
-                              <input
-                                type="text"
-                                placeholder={t('admin.reasonPlaceholder')}
-                                value={adjReason}
-                                onChange={(e) => setAdjReason(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700"
-                                required
-                              />
-                            </div>
-
-                            <div className="flex gap-2 pt-1">
-                              <button
-                                type="submit"
-                                disabled={isSubmittingAdj || !adjDriverId}
-                                className="flex-1 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg py-2 font-bold uppercase shadow-xs transition-all text-xs"
-                              >
-                                {isSubmittingAdj ? t('admin.adjusting') : `${t('admin.applyAdjustmentBtn')} (${adjType === 'add' ? '+' : '-'}${adjAmount || '1'})`}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setActiveAdjustVehicleId(null)}
-                                className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-2 font-bold text-xs"
-                              >
-                                {t('common.cancel')}
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-
-                      {/* Driver Breakdown */}
-                      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
-                        <div className="flex justify-between items-center text-slate-600">
-                          <span className="font-semibold text-[11px]">{t('common.slot1')}: {vehicle.driver1 ? vehicle.driver1.name : 'Unassigned'}</span>
-                          <span className="font-black text-slate-800">{vehicle.driver1 ? vehicle.driver1.reportedCount : 0} trips</span>
-                        </div>
-                        <div className="flex justify-between items-center text-slate-600 border-t border-slate-50 pt-1">
-                          <span className="font-semibold text-[11px]">{t('common.slot2')}: {vehicle.driver2 ? vehicle.driver2.name : 'Unassigned'}</span>
-                          <span className="font-black text-slate-800">{vehicle.driver2 ? vehicle.driver2.reportedCount : 0} trips</span>
-                        </div>
-                      </div>
-
-                      {/* Trips List */}
-                      <div>
-                        <h3 className="text-xs font-bold uppercase text-slate-500 mb-2 px-1">{t('driver.historyTitle')}</h3>
-                        {vehicle.trips.length === 0 ? (
-                          <div className="bg-white p-4 rounded-xl border border-slate-100 text-center text-sm font-semibold text-slate-400">
-                            {t('driver.noTripsLogged')}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            {vehicle.trips.map((trip, idx) => (
-                              <div key={trip.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center gap-3">
-                                <div className="bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center font-black text-slate-600 text-sm flex-shrink-0">
-                                  #{idx + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-bold text-slate-800 text-sm truncate">{trip.driverName}</span>
-                                    <span className="text-xs font-semibold text-slate-500 flex-shrink-0">
-                                      {formatTime(trip.completedAt)}
-                                    </span>
-                                  </div>
-                                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    trip.shift.includes('1') ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                                  }`}>
-                                    {trip.shift}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {filteredVehicles.map(vehicle => (
+              <VehicleCard
+                key={vehicle.id}
+                vehicle={vehicle}
+                isExpanded={expandedVehicleId === vehicle.id}
+                isSingleDay={isSingleDay}
+                dateRangeInfo={dateRangeInfo}
+                activeAdjustVehicleId={activeAdjustVehicleId}
+                adjDriverId={adjDriverId}
+                adjType={adjType}
+                adjAmount={adjAmount}
+                adjReason={adjReason}
+                isSubmittingAdj={isSubmittingAdj}
+                adjStatusMessage={adjStatusMessage}
+                t={t}
+                onToggleExpand={onToggleExpand}
+                onVerify={handleVerify}
+                onToggleAdjustForm={toggleAdjustForm}
+                onApplyAdjustment={handleApplyAdjustment}
+                onNavigateDiesel={onNavigateDiesel}
+                setAdjDriverId={setAdjDriverId}
+                setAdjType={setAdjType}
+                setAdjAmount={setAdjAmount}
+                setAdjReason={setAdjReason}
+                setActiveAdjustVehicleId={setActiveAdjustVehicleId}
+              />
+            ))}
           </div>
         )}
       </main>
