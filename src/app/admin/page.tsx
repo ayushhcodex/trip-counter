@@ -52,18 +52,28 @@ const VehicleCard = React.memo(({
   adjReason,
   isSubmittingAdj,
   adjStatusMessage,
+  activeDieselVehicleId,
+  dieselDriverId,
+  dieselLitres,
+  isSubmittingDiesel,
+  dieselStatusMessage,
   t,
   onToggleExpand,
   onVerify,
   onToggleAdjustForm,
   onQuickAdjust,
   onApplyAdjustment,
+  onToggleDieselForm,
+  onApplyDiesel,
   onNavigateDiesel,
   setAdjDriverId,
   setAdjType,
   setAdjAmount,
   setAdjReason,
   setActiveAdjustVehicleId,
+  setDieselDriverId,
+  setDieselLitres,
+  setActiveDieselVehicleId,
 }: {
   vehicle: Vehicle;
   isExpanded: boolean;
@@ -76,18 +86,28 @@ const VehicleCard = React.memo(({
   adjReason: string;
   isSubmittingAdj: boolean;
   adjStatusMessage: { type: 'success' | 'error'; text: string; vehicleId: string } | null;
+  activeDieselVehicleId: string | null;
+  dieselDriverId: string;
+  dieselLitres: string;
+  isSubmittingDiesel: boolean;
+  dieselStatusMessage: { type: 'success' | 'error'; text: string; vehicleId: string } | null;
   t: (key: string) => string;
   onToggleExpand: (id: string) => void;
   onVerify: (id: string) => void;
   onToggleAdjustForm: (v: Vehicle) => void;
   onQuickAdjust: (v: Vehicle, type: 'add' | 'remove') => void;
   onApplyAdjustment: (e: React.FormEvent, vehicleId: string) => void;
+  onToggleDieselForm: (v: Vehicle) => void;
+  onApplyDiesel: (e: React.FormEvent, vehicleId: string) => void;
   onNavigateDiesel: (vehicleId: string) => void;
   setAdjDriverId: (val: string) => void;
   setAdjType: (val: 'add' | 'remove') => void;
   setAdjAmount: (val: string) => void;
   setAdjReason: (val: string) => void;
   setActiveAdjustVehicleId: (id: string | null) => void;
+  setDieselDriverId: (val: string) => void;
+  setDieselLitres: (val: string) => void;
+  setActiveDieselVehicleId: (id: string | null) => void;
 }) => {
   const driversText = [
     vehicle.driver1?.name,
@@ -107,7 +127,7 @@ const VehicleCard = React.memo(({
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Header Card Strip */}
       <div className="p-4 flex flex-col gap-2.5">
-        {/* Top Row: Vehicle Number, Status Badge, Direct Fuel Log Button */}
+        {/* Top Row: Vehicle Number, Status Badge, Direct Diesel Log Button */}
         <div className="flex items-center justify-between">
           <div 
             onClick={() => onToggleExpand(vehicle.id)}
@@ -121,16 +141,20 @@ const VehicleCard = React.memo(({
             </span>
           </div>
 
-          {/* Prominent Direct Fuel Log Button */}
+          {/* Prominent Direct Diesel Button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onNavigateDiesel(vehicle.id);
+              onToggleDieselForm(vehicle);
             }}
-            className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 transition-all flex-shrink-0"
+            className={`font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 transition-all flex-shrink-0 active:scale-95 ${
+              activeDieselVehicleId === vehicle.id
+                ? 'bg-amber-700 text-white ring-2 ring-amber-300'
+                : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
           >
-            <span>⛽</span> {t('diesel.pageTitle')}
+            <span>⛽</span> Diesel
           </button>
         </div>
 
@@ -240,13 +264,104 @@ const VehicleCard = React.memo(({
               </button>
 
               <button
-                onClick={() => onNavigateDiesel(vehicle.id)}
-                className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
+                onClick={() => onToggleDieselForm(vehicle)}
+                className={`py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs ${
+                  activeDieselVehicleId === vehicle.id
+                    ? 'bg-amber-800 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
               >
-                <span>⛽</span> {t('diesel.pageTitle')} →
+                <span>⛽</span> {activeDieselVehicleId === vehicle.id ? t('common.cancel') : 'Quick Diesel'}
               </button>
             </div>
           </div>
+
+          {/* Instant Diesel Logger Form */}
+          {activeDieselVehicleId === vehicle.id && (
+            <div className="mb-4 bg-amber-50/80 p-3.5 rounded-xl border border-amber-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                <h4 className="font-extrabold text-xs text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>⛽</span> Instant Diesel Log
+                </h4>
+                <span className="text-[10px] text-amber-800 font-semibold">{dateRangeInfo?.start}</span>
+              </div>
+
+              {dieselStatusMessage && dieselStatusMessage.vehicleId === vehicle.id && (
+                <div className={`p-2 rounded-lg text-xs font-semibold text-center ${
+                  dieselStatusMessage.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
+                }`}>
+                  {dieselStatusMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={(e) => onApplyDiesel(e, vehicle.id)} className="space-y-2.5 text-xs">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-amber-900 mb-1">Target Driver</label>
+                  <select
+                    value={dieselDriverId}
+                    onChange={(e) => setDieselDriverId(e.target.value)}
+                    className="w-full bg-white border border-amber-300 rounded-lg p-2 text-xs text-slate-800 font-semibold"
+                    required
+                  >
+                    <option value="">Select Driver</option>
+                    {vehicle.driver1 && <option value={vehicle.driver1.id}>{t('common.slot1')}: {vehicle.driver1.name}</option>}
+                    {vehicle.driver2 && <option value={vehicle.driver2.id}>{t('common.slot2')}: {vehicle.driver2.name}</option>}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-amber-900 mb-1">Diesel Quantity (Litres)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="1500"
+                      placeholder="Enter Litres (e.g. 25)"
+                      value={dieselLitres}
+                      onChange={(e) => setDieselLitres(e.target.value)}
+                      className="w-full bg-white border border-amber-300 rounded-lg p-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                    <span className="font-black text-amber-900 text-sm">L</span>
+                  </div>
+                </div>
+
+                {/* Preset Chips */}
+                <div className="flex gap-1.5 pt-0.5">
+                  {[10, 20, 30, 50].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setDieselLitres(String(preset))}
+                      className="px-2.5 py-1 rounded-lg bg-amber-200/70 hover:bg-amber-300 text-amber-950 font-extrabold text-[11px] border border-amber-300 transition-all"
+                    >
+                      +{preset} L
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingDiesel || !dieselDriverId || !dieselLitres}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg py-2 font-bold uppercase shadow-xs transition-all text-xs flex items-center justify-center gap-1"
+                  >
+                    <span>⛽</span> {isSubmittingDiesel ? 'Saving Diesel...' : `Save ${dieselLitres ? `${dieselLitres} L` : ''} Diesel`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDieselVehicleId(null)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-2 font-bold text-xs"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Inline Quick Adjustment Form */}
           {activeAdjustVehicleId === vehicle.id && (
@@ -435,6 +550,13 @@ export default function AdminDashboard() {
   const [adjReason, setAdjReason] = useState<string>('');
   const [isSubmittingAdj, setIsSubmittingAdj] = useState<boolean>(false);
   const [adjStatusMessage, setAdjStatusMessage] = useState<{ type: 'success' | 'error'; text: string; vehicleId: string } | null>(null);
+
+  // Quick Inline Diesel Log States
+  const [activeDieselVehicleId, setActiveDieselVehicleId] = useState<string | null>(null);
+  const [dieselDriverId, setDieselDriverId] = useState<string>('');
+  const [dieselLitres, setDieselLitres] = useState<string>('');
+  const [isSubmittingDiesel, setIsSubmittingDiesel] = useState<boolean>(false);
+  const [dieselStatusMessage, setDieselStatusMessage] = useState<{ type: 'success' | 'error'; text: string; vehicleId: string } | null>(null);
 
   const cacheRef = useRef<Record<string, VehiclesResponse>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -674,6 +796,62 @@ export default function AdminDashboard() {
     }
   }, [dateRangeInfo, adjDriverId, adjReason, adjAmount, adjType, activeTab, customStartDate, customEndDate, fetchVehicles, t]);
 
+  const toggleDieselForm = useCallback((vehicle: Vehicle) => {
+    setActiveDieselVehicleId((prev) => {
+      if (prev === vehicle.id) {
+        setDieselStatusMessage(null);
+        return null;
+      }
+      setDieselDriverId(vehicle.driver1?.id || vehicle.driver2?.id || '');
+      setDieselLitres('');
+      setDieselStatusMessage(null);
+      return vehicle.id;
+    });
+    setExpandedVehicleId(vehicle.id);
+  }, []);
+
+  const handleApplyDiesel = useCallback(async (e: React.FormEvent, vehicleId: string) => {
+    e.preventDefault();
+    if (!dateRangeInfo) return;
+    if (!dieselDriverId) {
+      setDieselStatusMessage({ type: 'error', text: 'Please select a driver for diesel record.', vehicleId });
+      return;
+    }
+    const litresVal = parseFloat(dieselLitres);
+    if (isNaN(litresVal) || litresVal <= 0) {
+      setDieselStatusMessage({ type: 'error', text: 'Please enter a valid positive litres quantity.', vehicleId });
+      return;
+    }
+
+    setIsSubmittingDiesel(true);
+    setDieselStatusMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/diesel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId,
+          driverId: dieselDriverId,
+          date: dateRangeInfo.start,
+          litres: dieselLitres,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setDieselStatusMessage({ type: 'success', text: `✅ Recorded ${litresVal.toFixed(2)} L Diesel!`, vehicleId });
+        setDieselLitres('');
+      } else {
+        setDieselStatusMessage({ type: 'error', text: data.error || 'Failed to record diesel entry.', vehicleId });
+      }
+    } catch {
+      setDieselStatusMessage({ type: 'error', text: t('common.networkError'), vehicleId });
+    } finally {
+      setIsSubmittingDiesel(false);
+    }
+  }, [dateRangeInfo, dieselDriverId, dieselLitres, t]);
+
   const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
@@ -837,18 +1015,28 @@ export default function AdminDashboard() {
                 adjReason={adjReason}
                 isSubmittingAdj={isSubmittingAdj}
                 adjStatusMessage={adjStatusMessage}
+                activeDieselVehicleId={activeDieselVehicleId}
+                dieselDriverId={dieselDriverId}
+                dieselLitres={dieselLitres}
+                isSubmittingDiesel={isSubmittingDiesel}
+                dieselStatusMessage={dieselStatusMessage}
                 t={t}
                 onToggleExpand={onToggleExpand}
                 onVerify={handleVerify}
                 onToggleAdjustForm={toggleAdjustForm}
                 onQuickAdjust={handleQuickAdjust}
                 onApplyAdjustment={handleApplyAdjustment}
+                onToggleDieselForm={toggleDieselForm}
+                onApplyDiesel={handleApplyDiesel}
                 onNavigateDiesel={onNavigateDiesel}
                 setAdjDriverId={setAdjDriverId}
                 setAdjType={setAdjType}
                 setAdjAmount={setAdjAmount}
                 setAdjReason={setAdjReason}
                 setActiveAdjustVehicleId={setActiveAdjustVehicleId}
+                setDieselDriverId={setDieselDriverId}
+                setDieselLitres={setDieselLitres}
+                setActiveDieselVehicleId={setActiveDieselVehicleId}
               />
             ))}
           </div>
