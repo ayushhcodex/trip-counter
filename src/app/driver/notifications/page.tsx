@@ -15,11 +15,14 @@ interface NotificationItem {
   createdAt: string;
 }
 
+// In-memory instant cache for zero-delay tab switching
+let cachedNotifications: NotificationItem[] | null = null;
+
 export default function DriverNotifications() {
   const router = useRouter();
   const { t, language } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(() => !cachedNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => cachedNotifications || []);
   const [errorMsg, setErrorMsg] = useState('');
   const [ackLoading, setAckLoading] = useState<string | null>(null);
 
@@ -33,6 +36,7 @@ export default function DriverNotifications() {
       const data = await res.json();
       if (data.success) {
         setNotifications(data.notifications);
+        cachedNotifications = data.notifications;
       }
     } catch (error) {
       console.error('Failed to load notifications:', error);

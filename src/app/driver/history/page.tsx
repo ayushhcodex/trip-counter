@@ -31,11 +31,14 @@ interface HistoryDay {
   adjustments: AdjustmentLog[];
 }
 
+// In-memory instant cache for zero-delay tab switching
+let cachedHistoryData: HistoryDay[] | null = null;
+
 export default function DriverHistory() {
   const router = useRouter();
   const { t, language } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [history, setHistory] = useState<HistoryDay[]>([]);
+  const [loading, setLoading] = useState<boolean>(() => !cachedHistoryData);
+  const [history, setHistory] = useState<HistoryDay[]>(() => cachedHistoryData || []);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [ackLoading, setAckLoading] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,6 +53,7 @@ export default function DriverHistory() {
       const data = await res.json();
       if (data.success) {
         setHistory(data.history);
+        cachedHistoryData = data.history;
       }
     } catch (error) {
       console.error('Failed to load history:', error);

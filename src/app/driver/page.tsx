@@ -31,15 +31,26 @@ function generateUUID(): string {
   });
 }
 
+interface DriverDashboardCache {
+  driverName: string;
+  vehicle: VehicleInfo | null;
+  todayTrips: TripItem[];
+  adjustmentsTotal: number;
+  isVerified: boolean;
+}
+
+// In-memory instant cache for zero-delay tab switching
+let cachedDashboardData: DriverDashboardCache | null = null;
+
 export default function DriverDashboard() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [driverName, setDriverName] = useState('');
-  const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
-  const [todayTrips, setTodayTrips] = useState<TripItem[]>([]);
-  const [adjustmentsTotal, setAdjustmentsTotal] = useState<number>(0);
-  const [isVerified, setIsVerified] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(() => !cachedDashboardData);
+  const [driverName, setDriverName] = useState<string>(() => cachedDashboardData?.driverName || '');
+  const [vehicle, setVehicle] = useState<VehicleInfo | null>(() => cachedDashboardData?.vehicle || null);
+  const [todayTrips, setTodayTrips] = useState<TripItem[]>(() => cachedDashboardData?.todayTrips || []);
+  const [adjustmentsTotal, setAdjustmentsTotal] = useState<number>(() => cachedDashboardData?.adjustmentsTotal || 0);
+  const [isVerified, setIsVerified] = useState<boolean>(() => cachedDashboardData?.isVerified || false);
   
   // Offline / sync states
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true);
@@ -50,26 +61,38 @@ export default function DriverDashboard() {
 
   const currentShift = getShiftInfo();
 
-  // 1. Initial Load: Auth profile and today's trips
+  // 1. Initial Load: Auth profile and today's trips (Parallel & SWR)
   const loadDashboardData = async () => {
     try {
-      // Get profile info
-      const profileRes = await fetch('/api/auth/me');
-      if (!profileRes.ok) {
+      // Execute all 3 API queries in parallel for instant speed
+      const [profileRes, tripsRes, notifRes] = await Promise.all([
+        fetch('/api/auth/me'),
+        fetch('/api/trips'),
+        fetch('/api/notifications')
+      ]);
+
+      if (profileRes.status === 401 || tripsRes.status === 401) {
         router.push('/login');
         return;
       }
-      const profileData = await profileRes.json();
-      setDriverName(profileData.user.name);
 
-      // Get vehicle and today's trips
-      const tripsRes = await fetch('/api/trips');
+      let newDriverName = driverName;
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        newDriverName = profileData.user.name;
+        setDriverName(newDriverName);
+      }
+
       if (tripsRes.ok) {
         const tripsData = await tripsRes.json();
         if (tripsData.assigned) {
-          setVehicle(tripsData.vehicle);
-          setAdjustmentsTotal(tripsData.adjustmentsTotal || 0);
-          setIsVerified(tripsData.isVerified || false);
+          const assignedVehicle = tripsData.vehicle;
+          const adjTotal = tripsData.adjustmentsTotal || 0;
+          const verified = tripsData.isVerified || false;
+
+          setVehicle(assignedVehicle);
+          setAdjustmentsTotal(adjTotal);
+          setIsVerified(verified);
           
           // Merge local queued offline trips for this vehicle with backend trips
           const queued = await getQueuedTrips();
@@ -81,17 +104,34 @@ export default function DriverDashboard() {
             isOffline: true,
           }));
 
-          setTodayTrips([...formattedQueued, ...tripsData.trips]);
+          const mergedTrips = [...formattedQueued, ...tripsData.trips];
+          setTodayTrips(mergedTrips);
+
+          // Update instant cache for 0ms tab switching
+          cachedDashboardData = {
+            driverName: newDriverName,
+            vehicle: assignedVehicle,
+            todayTrips: mergedTrips,
+            adjustmentsTotal: adjTotal,
+            isVerified: verified,
+          };
         } else {
           setVehicle(null);
           setTodayTrips([]);
           setAdjustmentsTotal(0);
           setIsVerified(false);
+
+          cachedDashboardData = {
+            driverName: newDriverName,
+            vehicle: null,
+            todayTrips: [],
+            adjustmentsTotal: 0,
+            isVerified: false,
+          };
         }
       }
 
       // Check notifications
-      const notifRes = await fetch('/api/notifications');
       if (notifRes.ok) {
         const notifData = await notifRes.json();
         const hasUnread = (notifData.notifications || []).some((n: any) => !n.readAt);

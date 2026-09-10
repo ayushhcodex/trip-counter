@@ -21,56 +21,80 @@ interface DieselMetrics {
   monthLitres: number;
 }
 
+interface DieselCache {
+  entries: DieselEntry[];
+  metrics: DieselMetrics;
+  userRole: string;
+  userName: string;
+}
+
+// In-memory instant cache for zero-delay tab switching
+let cachedDieselData: DieselCache | null = null;
+
 export default function DriverDieselPage() {
   const router = useRouter();
   const { t, language } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [entries, setEntries] = useState<DieselEntry[]>([]);
-  const [metrics, setMetrics] = useState<DieselMetrics>({
+  const [loading, setLoading] = useState<boolean>(() => !cachedDieselData);
+  const [entries, setEntries] = useState<DieselEntry[]>(() => cachedDieselData?.entries || []);
+  const [metrics, setMetrics] = useState<DieselMetrics>(() => cachedDieselData?.metrics || {
     totalLitres: 0,
     todayLitres: 0,
     monthLitres: 0,
   });
   const [unreadNotifications, setUnreadNotifications] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [userRole, setUserRole] = useState<string>('DRIVER');
-  const [userName, setUserName] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>(() => cachedDieselData?.userRole || 'DRIVER');
+  const [userName, setUserName] = useState<string>(() => cachedDieselData?.userName || '');
 
   const loadDieselData = async () => {
-    setLoading(true);
     setErrorMsg('');
     try {
-      // 1. Check user profile
-      const meRes = await fetch('/api/auth/me');
-      if (meRes.status === 401) {
+      // Parallel API calls for maximum speed
+      const [meRes, res, notifRes] = await Promise.all([
+        fetch('/api/auth/me'),
+        fetch('/api/driver/diesel'),
+        fetch('/api/notifications')
+      ]);
+
+      if (meRes.status === 401 || res.status === 401) {
         router.push('/login');
         return;
       }
+
+      let currentRole = userRole;
+      let currentName = userName;
+
       if (meRes.ok) {
         const meData = await meRes.json();
         if (meData.user) {
-          setUserRole(meData.user.role || 'DRIVER');
-          setUserName(meData.user.name || '');
+          currentRole = meData.user.role || 'DRIVER';
+          currentName = meData.user.name || '';
+          setUserRole(currentRole);
+          setUserName(currentName);
         }
       }
 
-      // 2. Fetch diesel data
-      const res = await fetch('/api/driver/diesel');
-      if (res.status === 401) {
-        router.push('/login');
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const newEntries = data.entries || [];
+          const newMetrics = data.metrics || { totalLitres: 0, todayLitres: 0, monthLitres: 0 };
+          setEntries(newEntries);
+          setMetrics(newMetrics);
+
+          // Update instant cache for zero-delay tab navigation
+          cachedDieselData = {
+            entries: newEntries,
+            metrics: newMetrics,
+            userRole: currentRole,
+            userName: currentName,
+          };
+        } else {
+          setErrorMsg(data.error || 'Unable to retrieve diesel records.');
+        }
       }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setEntries(data.entries || []);
-        setMetrics(data.metrics || { totalLitres: 0, todayLitres: 0, monthLitres: 0 });
-      } else {
-        setErrorMsg(data.error || 'Unable to retrieve diesel records.');
-      }
-
-      // 3. Check notifications (for drivers)
-      const notifRes = await fetch('/api/notifications');
+      // Check notifications
       if (notifRes.ok) {
         const notifData = await notifRes.json();
         const hasUnread = (notifData.notifications || []).some((n: any) => !n.readAt);
