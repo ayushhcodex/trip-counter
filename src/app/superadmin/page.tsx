@@ -426,46 +426,6 @@ export default function SuperAdminDashboard() {
         </div>
       </header>
 
-      {/* 4 Prominent High-Contrast Control Tabs at Top */}
-      <section className="bg-white border-b border-slate-200 px-4 sm:px-6 sticky top-[68px] z-10 shadow-sm">
-        <div className="grid grid-cols-4 gap-1 sm:gap-4 max-w-7xl mx-auto py-2">
-          {[
-            { id: 'vehicles', label: 'Fleet Vehicles', icon: '🚛', count: vehiclesList.length },
-            { id: 'users', label: 'Users & Staff', icon: '👥', count: usersList.length },
-            { id: 'assignments', label: 'Assignments', icon: '🔗', count: driverAssignments.length + adminAssignments.length },
-            { id: 'audits', label: 'Audit Logs', icon: '📜', count: auditLogsList.length },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setSearchTerm('');
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-                className={`py-3 px-2 rounded-xl font-black text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all border ${
-                  isActive
-                    ? 'bg-blue-900 text-white border-blue-950 shadow-md ring-2 ring-blue-300'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                }`}
-              >
-                <span className="text-lg">{tab.icon}</span>
-                <span className="truncate">{tab.label}</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    isActive ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
       {/* Main Content Area */}
       <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
         {errorMsg && (
@@ -1055,6 +1015,47 @@ export default function SuperAdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Sticky Bottom Navigation Bar (Typical App Style 4 Tabs) */}
+      <footer className="bg-white border-t border-slate-200 sticky bottom-0 z-30 shadow-lg px-2 sm:px-6 py-2">
+        <div className="grid grid-cols-4 gap-1 sm:gap-4 max-w-7xl mx-auto">
+          {[
+            { id: 'vehicles', label: 'Vehicles', icon: '🚛', count: vehiclesList.length },
+            { id: 'users', label: 'Users & Staff', icon: '👥', count: usersList.length },
+            { id: 'assignments', label: 'Assignments', icon: '🔗', count: driverAssignments.length + adminAssignments.length },
+            { id: 'audits', label: 'Audit Logs', icon: '📜', count: auditLogsList.length },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setSearchTerm('');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`py-2 px-1 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all relative ${
+                  isActive
+                    ? 'text-blue-900 font-black scale-105'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="text-xl">{tab.icon}</span>
+                <span className="truncate text-[11px] tracking-tight">{tab.label}</span>
+                {isActive && (
+                  <span className="w-1.5 h-1.5 bg-blue-900 rounded-full mt-0.5" />
+                )}
+                {tab.count > 0 && (
+                  <span className="absolute top-0.5 right-2 sm:right-6 text-[9px] font-black bg-blue-50 border border-blue-200 text-blue-900 px-1.5 py-0.2 rounded-full">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </footer>
     </div>
   );
 }
