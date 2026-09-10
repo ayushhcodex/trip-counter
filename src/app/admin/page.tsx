@@ -56,6 +56,7 @@ const VehicleCard = React.memo(({
   onToggleExpand,
   onVerify,
   onToggleAdjustForm,
+  onQuickAdjust,
   onApplyAdjustment,
   onNavigateDiesel,
   setAdjDriverId,
@@ -79,6 +80,7 @@ const VehicleCard = React.memo(({
   onToggleExpand: (id: string) => void;
   onVerify: (id: string) => void;
   onToggleAdjustForm: (v: Vehicle) => void;
+  onQuickAdjust: (v: Vehicle, type: 'add' | 'remove') => void;
   onApplyAdjustment: (e: React.FormEvent, vehicleId: string) => void;
   onNavigateDiesel: (vehicleId: string) => void;
   setAdjDriverId: (val: string) => void;
@@ -103,27 +105,84 @@ const VehicleCard = React.memo(({
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Header (Clickable) */}
-      <div 
-        onClick={() => onToggleExpand(vehicle.id)}
-        className="p-4 flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors"
-      >
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+      {/* Header Card Strip */}
+      <div className="p-4 flex flex-col gap-2.5">
+        {/* Top Row: Vehicle Number, Status Badge, Direct Fuel Log Button */}
+        <div className="flex items-center justify-between">
+          <div 
+            onClick={() => onToggleExpand(vehicle.id)}
+            className="flex items-center gap-2 cursor-pointer min-w-0"
+          >
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight truncate">
               {vehicle.vehicleNumber}
             </h2>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${statusColor}`}>
               {vehicle.status === 'ACTIVE' ? t('common.active') : vehicle.status === 'BREAKDOWN' ? t('common.breakdown') : t('common.inactive')}
             </span>
           </div>
-          <p className="text-xs text-slate-500 font-semibold truncate">
-            {driversText}
-          </p>
+
+          {/* Prominent Direct Fuel Log Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigateDiesel(vehicle.id);
+            }}
+            className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 transition-all flex-shrink-0"
+          >
+            <span>⛽</span> {t('diesel.pageTitle')}
+          </button>
         </div>
-        
-        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-blue-800 to-blue-950 shadow-inner flex-shrink-0 ml-3">
-          <span className="text-xl font-black text-white">{vehicle.reportedCount}</span>
+
+        {/* Bottom Row: Drivers List + Stepper (+ / -) & Count Badge */}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+          <div 
+            onClick={() => onToggleExpand(vehicle.id)}
+            className="flex flex-col min-w-0 pr-2 cursor-pointer flex-1"
+          >
+            <span className="text-[10px] uppercase font-bold text-slate-400">Drivers</span>
+            <p className="text-xs text-slate-700 font-bold truncate">
+              {driversText}
+            </p>
+          </div>
+
+          {/* Stepper Buttons: minus (-1), Reported Count, plus (+1) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Quick Remove (-) Button */}
+            <button
+              type="button"
+              title="Remove Trip (-1)"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickAdjust(vehicle, 'remove');
+              }}
+              className="w-10 h-10 rounded-xl bg-red-50 hover:bg-red-100 active:scale-90 text-red-600 font-black text-2xl flex items-center justify-center border border-red-200 shadow-xs transition-all"
+            >
+              −
+            </button>
+
+            {/* Reported Count Badge */}
+            <div 
+              onClick={() => onToggleExpand(vehicle.id)}
+              className="flex flex-col items-center justify-center w-12 h-10 rounded-xl bg-gradient-to-br from-blue-900 to-slate-900 shadow-inner text-white cursor-pointer"
+            >
+              <span className="text-base font-black leading-none">{vehicle.reportedCount}</span>
+              <span className="text-[8px] font-extrabold text-blue-200 uppercase mt-0.5">Trips</span>
+            </div>
+
+            {/* Quick Add (+) Button */}
+            <button
+              type="button"
+              title="Add Trip (+1)"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickAdjust(vehicle, 'add');
+              }}
+              className="w-10 h-10 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-90 text-emerald-600 font-black text-2xl flex items-center justify-center border border-emerald-200 shadow-xs transition-all"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
 
@@ -182,7 +241,7 @@ const VehicleCard = React.memo(({
 
               <button
                 onClick={() => onNavigateDiesel(vehicle.id)}
-                className="bg-slate-800 hover:bg-slate-900 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
+                className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-3 rounded-xl font-bold shadow-xs transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
               >
                 <span>⛽</span> {t('diesel.pageTitle')} →
               </button>
@@ -546,6 +605,16 @@ export default function AdminDashboard() {
     });
   }, []);
 
+  const handleQuickAdjust = useCallback((vehicle: Vehicle, type: 'add' | 'remove') => {
+    setActiveAdjustVehicleId(vehicle.id);
+    setAdjDriverId(vehicle.driver1?.id || vehicle.driver2?.id || '');
+    setAdjType(type);
+    setAdjAmount('1');
+    setAdjReason('');
+    setAdjStatusMessage(null);
+    setExpandedVehicleId(vehicle.id);
+  }, []);
+
   const handleApplyAdjustment = useCallback(async (e: React.FormEvent, vehicleId: string) => {
     e.preventDefault();
     if (!dateRangeInfo) return;
@@ -759,6 +828,7 @@ export default function AdminDashboard() {
                 onToggleExpand={onToggleExpand}
                 onVerify={handleVerify}
                 onToggleAdjustForm={toggleAdjustForm}
+                onQuickAdjust={handleQuickAdjust}
                 onApplyAdjustment={handleApplyAdjustment}
                 onNavigateDiesel={onNavigateDiesel}
                 setAdjDriverId={setAdjDriverId}
