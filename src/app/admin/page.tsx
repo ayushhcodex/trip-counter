@@ -313,33 +313,36 @@ const VehicleCard = React.memo(({
 
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-amber-900 mb-1">Diesel Quantity (Litres)</label>
-                  <select
-                    value={dieselLitres}
-                    onChange={(e) => setDieselLitres(e.target.value)}
-                    className="w-full bg-white border border-amber-300 rounded-lg p-2.5 text-sm text-slate-900 font-extrabold focus:outline-none focus:ring-2 focus:ring-amber-500 mb-2"
-                    required
-                  >
-                    <option value="">Select Diesel Option (100L, 150L, 200L)</option>
-                    <option value="100">100 Litres</option>
-                    <option value="150">150 Litres</option>
-                    <option value="200">200 Litres</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="1500"
+                      placeholder="Enter Litres (e.g. 100)"
+                      value={dieselLitres}
+                      onChange={(e) => setDieselLitres(e.target.value)}
+                      className="w-full bg-white border border-amber-300 rounded-lg p-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                    <span className="font-black text-amber-900 text-sm">L</span>
+                  </div>
                 </div>
 
-                {/* Preset Chips: 100, 150, 200 */}
-                <div className="grid grid-cols-3 gap-2 pt-0.5">
+                {/* Below side quick preset options: 100, 150, 200 */}
+                <div className="flex gap-2 pt-0.5">
                   {[100, 150, 200].map((preset) => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setDieselLitres(String(preset))}
-                      className={`py-2 rounded-lg font-black text-xs border transition-all text-center ${
+                      className={`flex-1 py-1.5 rounded-lg font-black text-xs border transition-all text-center ${
                         dieselLitres === String(preset)
-                          ? 'bg-amber-700 text-white border-amber-800 shadow-sm'
-                          : 'bg-amber-200/80 hover:bg-amber-300 text-amber-950 border-amber-400'
+                          ? 'bg-amber-700 text-white border-amber-800 shadow-xs'
+                          : 'bg-amber-200/70 hover:bg-amber-300 text-amber-950 border-amber-300'
                       }`}
                     >
-                      {preset} L
+                      +{preset} L
                     </button>
                   ))}
                 </div>

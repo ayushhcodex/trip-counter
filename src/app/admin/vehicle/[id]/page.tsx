@@ -622,31 +622,31 @@ export default function VehicleDetailPage(props: { params: Promise<{ id: string 
 
                   <div>
                     <label className="block uppercase font-bold text-slate-400 mb-1">{t('diesel.litres')}</label>
-                    <select
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.1"
+                      placeholder="e.g. 100"
                       value={dieselLitres}
                       onChange={(e) => setDieselLitres(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 font-extrabold mb-2"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 font-bold mb-2"
                       required
-                    >
-                      <option value="">Select Litres Option (100L, 150L, 200L)</option>
-                      <option value="100">100 Litres</option>
-                      <option value="150">150 Litres</option>
-                      <option value="200">200 Litres</option>
-                    </select>
+                    />
 
+                    {/* Quick preset options below */}
                     <div className="grid grid-cols-3 gap-2">
                       {[100, 150, 200].map((preset) => (
                         <button
                           key={preset}
                           type="button"
                           onClick={() => setDieselLitres(String(preset))}
-                          className={`py-2 rounded-lg font-black text-xs border transition-all text-center ${
+                          className={`py-1.5 rounded-lg font-black text-xs border transition-all text-center ${
                             dieselLitres === String(preset)
-                              ? 'bg-blue-900 text-white border-blue-950 shadow-sm'
+                              ? 'bg-blue-900 text-white border-blue-950 shadow-xs'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
                           }`}
                         >
-                          {preset} L
+                          +{preset} L
                         </button>
                       ))}
                     </div>
