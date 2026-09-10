@@ -287,25 +287,42 @@ export default function DriverDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-5 flex flex-col items-center">
-        {/* Welcome Block */}
-        <div className="w-full text-center mb-4">
-          <h2 className="text-xl font-bold text-slate-800">
-            {driverName}
-          </h2>
+        {/* Vehicle & Driver Header Card */}
+        <div className="w-full text-center mb-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           {vehicle ? (
-            <div className="flex flex-col items-center mt-1.5 space-y-1.5">
-              <p className="text-xs sm:text-sm font-semibold text-slate-500">
-                {t('driver.assignedVehicle')}: <span className="text-blue-900 uppercase font-extrabold">{vehicle.vehicleNumber}</span> ({vehicle.slot === 1 ? t('common.slot1') : t('common.slot2')})
-              </p>
-              <div className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-full text-xs font-bold">
-                <span>⏰ {currentShift.shiftNumber === 1 ? t('common.dayShift') : t('common.nightShift')}</span>
+            <>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  {t('driver.assignedVehicle')}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-blue-950 uppercase tracking-tight flex items-center justify-center gap-2 mt-0.5">
+                  <span className="text-2xl">🚛</span>
+                  <span>{vehicle.vehicleNumber}</span>
+                </h2>
               </div>
-            </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                  👤 Driver: <strong className="text-slate-900">{driverName}</strong> ({vehicle.slot === 1 ? t('common.slot1') : t('common.slot2')})
+                </span>
+                <span className="text-xs font-bold text-blue-900 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                  ⏰ {currentShift.shiftNumber === 1 ? t('common.dayShift') : t('common.nightShift')}
+                </span>
+              </div>
+            </>
           ) : (
-            <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-3 mt-2 text-xs font-semibold">
-              <p className="font-bold">{t('driver.noVehicleAssigned')}</p>
-              <p className="mt-0.5 text-slate-600">{t('driver.contactAdmin')}</p>
-            </div>
+            <>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                Assigned Driver
+              </span>
+              <h2 className="text-xl font-black text-slate-800 flex items-center justify-center gap-1.5">
+                <span>👤</span> {driverName}
+              </h2>
+              <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-3 text-xs font-semibold">
+                <p className="font-bold">{t('driver.noVehicleAssigned')}</p>
+                <p className="mt-0.5 text-slate-600">{t('driver.contactAdmin')}</p>
+              </div>
+            </>
           )}
         </div>
 
