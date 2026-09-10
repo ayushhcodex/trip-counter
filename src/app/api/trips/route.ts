@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { trips, vehicleDriverAssignments, vehicles, users, dailyVehicleVerifications } from '@/db/schema';
-import { eq, and, isNull, gte, lte, desc } from 'drizzle-orm';
+import { trips, vehicleDriverAssignments, vehicles, users, dailyVehicleVerifications, tripAdjustments } from '@/db/schema';
+import { eq, and, isNull, gte, lte, desc, sql } from 'drizzle-orm';
 import { checkAuth } from '@/lib/api-middlewares';
 import { getDateBoundaries, getLocalDateString } from '@/lib/timezone';
 import { logAudit } from '@/lib/audit';
@@ -36,7 +36,10 @@ export async function GET() {
         assigned: false,
         vehicle: null,
         trips: [],
+        reportedCount: 0,
+        adjustmentsTotal: 0,
         todayCount: 0,
+        isVerified: false,
       });
     }
 
@@ -61,6 +64,35 @@ export async function GET() {
       )
       .orderBy(desc(trips.completedAt));
 
+    // 3. Fetch today's supervisor adjustments for this driver & vehicle
+    const [adjustmentsResult] = await db
+      .select({ sum: sql<number>`coalesce(sum(${tripAdjustments.adjustment}), 0)::int` })
+      .from(tripAdjustments)
+      .where(
+        and(
+          eq(tripAdjustments.driverId, actor!.userId),
+          eq(tripAdjustments.vehicleId, assignment.vehicleId),
+          eq(tripAdjustments.date, todayStr)
+        )
+      );
+    const adjustmentsTotal = adjustmentsResult?.sum || 0;
+
+    // 4. Fetch verification status for this vehicle on today's date
+    const [verification] = await db
+      .select({ status: dailyVehicleVerifications.status })
+      .from(dailyVehicleVerifications)
+      .where(
+        and(
+          eq(dailyVehicleVerifications.vehicleId, assignment.vehicleId),
+          eq(dailyVehicleVerifications.date, todayStr)
+        )
+      )
+      .limit(1);
+
+    const isVerified = verification?.status === 'VERIFIED';
+    const reportedCount = todayTrips.length;
+    const netCount = Math.max(0, reportedCount + adjustmentsTotal);
+
     return NextResponse.json({
       success: true,
       assigned: true,
@@ -71,7 +103,10 @@ export async function GET() {
         slot: assignment.slot,
       },
       trips: todayTrips,
-      todayCount: todayTrips.length,
+      reportedCount,
+      adjustmentsTotal,
+      todayCount: netCount,
+      isVerified,
     });
   } catch (error) {
     console.error('[DRIVER_TRIPS_GET_ERROR]', error);

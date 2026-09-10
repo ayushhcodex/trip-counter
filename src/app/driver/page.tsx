@@ -38,6 +38,8 @@ export default function DriverDashboard() {
   const [driverName, setDriverName] = useState('');
   const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
   const [todayTrips, setTodayTrips] = useState<TripItem[]>([]);
+  const [adjustmentsTotal, setAdjustmentsTotal] = useState<number>(0);
+  const [isVerified, setIsVerified] = useState<boolean>(false);
   
   // Offline / sync states
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true);
@@ -66,6 +68,8 @@ export default function DriverDashboard() {
         const tripsData = await tripsRes.json();
         if (tripsData.assigned) {
           setVehicle(tripsData.vehicle);
+          setAdjustmentsTotal(tripsData.adjustmentsTotal || 0);
+          setIsVerified(tripsData.isVerified || false);
           
           // Merge local queued offline trips for this vehicle with backend trips
           const queued = await getQueuedTrips();
@@ -81,6 +85,8 @@ export default function DriverDashboard() {
         } else {
           setVehicle(null);
           setTodayTrips([]);
+          setAdjustmentsTotal(0);
+          setIsVerified(false);
         }
       }
 
@@ -102,6 +108,13 @@ export default function DriverDashboard() {
   useEffect(() => {
     loadDashboardData();
 
+    // Live 5-second polling so supervisor adjustments & verification status update in real-time
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadDashboardData();
+      }
+    }, 5000);
+
     // Setup network status listeners
     const handleOnline = () => {
       setIsOnline(true);
@@ -113,6 +126,7 @@ export default function DriverDashboard() {
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -301,16 +315,54 @@ export default function DriverDashboard() {
           </div>
         )}
 
-        {/* Today's Count */}
-        <div className="flex flex-col items-center justify-center my-2">
-          <span className="text-xs uppercase font-bold tracking-wider text-slate-400">{t('driver.todaysTrips')}</span>
-          <span className="text-7xl font-black text-slate-800 tracking-tighter my-1">
-            {todayTrips.length}
-          </span>
-          <span className="text-xs text-slate-500 font-semibold">
-            {getLastTripTime()}
-          </span>
-        </div>
+        {/* Today's Net Count Card */}
+        {(() => {
+          const netTripCount = Math.max(0, todayTrips.length + adjustmentsTotal);
+          return (
+            <div className={`w-full max-w-xs rounded-3xl p-5 my-3 flex flex-col items-center justify-center transition-all border shadow-sm ${
+              isVerified
+                ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white border-emerald-500 shadow-emerald-200 ring-4 ring-emerald-100'
+                : 'bg-white text-slate-800 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className={`text-xs uppercase font-extrabold tracking-wider ${isVerified ? 'text-emerald-100' : 'text-slate-400'}`}>
+                  {t('driver.todaysTrips')}
+                </span>
+              </div>
+
+              <span className={`text-7xl font-black tracking-tighter my-1 ${isVerified ? 'text-white' : 'text-slate-900'}`}>
+                {netTripCount}
+              </span>
+
+              {/* Verification Status Badge */}
+              {isVerified ? (
+                <div className="mt-2 bg-white/20 backdrop-blur-md text-white px-3.5 py-1 rounded-full font-extrabold text-xs flex items-center gap-1.5 border border-white/30 shadow-xs">
+                  <svg className="w-4 h-4 text-emerald-200" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>{t('admin.verifiedBadge')}</span>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500 font-semibold mt-1">
+                  {getLastTripTime()}
+                </span>
+              )}
+
+              {/* Supervisor Adjustments Indicator */}
+              {adjustmentsTotal !== 0 && (
+                <div className={`mt-2.5 text-[11px] font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
+                  isVerified 
+                    ? 'bg-emerald-800/60 text-emerald-100 border border-emerald-400/40' 
+                    : adjustmentsTotal > 0 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  <span>⚡</span> Admin Adjustment: {adjustmentsTotal > 0 ? `+${adjustmentsTotal}` : adjustmentsTotal}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Complete Trip Button */}
         <div className="my-6">
