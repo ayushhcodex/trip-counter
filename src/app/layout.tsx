@@ -49,7 +49,6 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="application-name" content="Trip Zoo" />
@@ -63,11 +62,16 @@ export default function RootLayout({
                 window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
               });
               if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
+                var registerSW = function() {
                   navigator.serviceWorker.register('/sw.js').catch(function(err) {
                     console.error('[PWA SW]', err);
                   });
-                });
+                };
+                if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                  registerSW();
+                } else {
+                  window.addEventListener('load', registerSW);
+                }
               }
             `,
           }}
