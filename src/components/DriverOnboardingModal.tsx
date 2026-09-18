@@ -21,18 +21,16 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
     }
   }, []);
 
-  const apkUrl = `${appUrl || 'https://tripzoo.vercel.app'}/api/download/apk`;
-
   if (!isOpen) return null;
 
   const getWhatsappMessage = () => {
     if (language === 'hi') {
-      return `🚗 *ट्रिपज़ू (Trip Zoo) - ड्राइवर ऐप*\n\nसभी ड्राइवर्स कृपया नीचे दिए गए लिंक से Trip Zoo ऐप डाउनलोड व इंस्टॉल करें:\n\n🔗 *वेबसाइट लिंक:* ${appUrl}\n📲 *डायरेक्ट Android APK:* ${apkUrl}\n\n*ऐप इंस्टॉल कैसे करें:*\n1. लिंक पर क्लिक करें (Chrome या ब्राउज़र में)\n2. "Install App" या "Add to Home Screen" दबाएं\n3. अपना Driver ID (उदा. drv0001) और पासवर्ड डालकर लॉगिन करें।`;
+      return `🚗 *ट्रिपज़ू (Trip Zoo) - ड्राइवर ऐप*\n\nसभी ड्राइवर्स कृपया नीचे दिए गए लिंक से Trip Zoo ऐप खोलें व इंस्टॉल करें:\n\n🔗 *वेबसाइट लिंक:* ${appUrl}\n\n*ऐप इंस्टॉल कैसे करें:*\n1. लिंक पर क्लिक करें (Chrome या ब्राउज़र में)\n2. "Install App" या "Add to Home Screen" दबाएं\n3. अपना Driver ID (उदा. drv0001) और पासवर्ड डालकर लॉगिन करें।`;
     }
     if (language === 'gu') {
-      return `🚗 *ટ્રિપઝૂ (Trip Zoo) - ડ્રાઇવર એપ*\n\nબધા ડ્રાઇવરો કૃપા કરીને નીચેની લિંક પરથી Trip Zoo એપ ઇન્સ્ટોલ કરો:\n\n🔗 *વેબસાઇટ લિંક:* ${appUrl}\n📲 *Android APK ડાઉનલોડ:* ${apkUrl}\n\n*ઇન્સ્ટોલ કરવાની રીત:*\n1. લિંક ખોલો અને "Add to Home Screen" અથવા "Install" દબાવો\n2. તમારું Driver ID (દા.ત. drv0001) અને પાસવર્ડથી લોગિન કરો.`;
+      return `🚗 *ટ્રિપઝૂ (Trip Zoo) - ડ્રાઇવર એપ*\n\nબધા ડ્રાઇવરો કૃપા કરીને નીચેની લિંક પરથી Trip Zoo એપ ઇન્સ્ટોલ કરો:\n\n🔗 *વેબસાઇટ લિંક:* ${appUrl}\n\n*ઇન્સ્ટોલ કરવાની રીત:*\n1. લિંક ખોલો અને "Add to Home Screen" અથવા "Install" દબાવો\n2. તમારું Driver ID (દા.ત. drv0001) અને પાસવર્ડથી લોગિન કરો.`;
     }
-    return `🚗 *Trip Zoo - Driver App*\n\nAll drivers please install the Trip Zoo app on your mobile phone to record daily trips:\n\n🔗 *Web App Link:* ${appUrl}\n📲 *Direct Android APK:* ${apkUrl}\n\n*How to Install:*\n1. Tap the link to open in Chrome or your phone browser\n2. Tap "Install App" or "Add to Home Screen"\n3. Sign in with your Driver ID (e.g. drv0001) and Password.`;
+    return `🚗 *Trip Zoo - Driver App*\n\nAll drivers please install the Trip Zoo app on your mobile phone to record daily trips:\n\n🔗 *Web App Link:* ${appUrl}\n\n*How to Install:*\n1. Tap the link to open in Chrome or your phone browser\n2. Tap "Install App" or "Add to Home Screen"\n3. Sign in with your Driver ID (e.g. drv0001) and Password.`;
   };
 
   const handleCopyWhatsappText = async () => {
@@ -142,27 +140,15 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
                 💡 <strong>In-Person Roll Call:</strong> Ask drivers to open their phone camera, Google Lens, or WhatsApp scanner and point at this QR code.
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 shadow-inner flex flex-col items-center">
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 shadow-inner flex flex-col items-center">
                 <QrCode value={appUrl || 'https://tripzoo.vercel.app'} size={220} />
-                <p className="text-xs font-mono font-bold text-slate-500 mt-2 truncate max-w-xs">
+                <p className="text-xs font-mono font-bold text-slate-500 mt-3 truncate max-w-xs">
                   {appUrl || 'https://tripzoo.vercel.app'}
                 </p>
               </div>
 
-              {/* Direct APK Download Link */}
-              <div className="w-full max-w-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
-                <div className="text-left">
-                  <p className="text-xs font-black uppercase tracking-wider text-blue-200">Alternative Option</p>
-                  <p className="text-sm font-extrabold">Download Android APK directly</p>
-                  <p className="text-[11px] text-blue-100">For Samsung / Vivo / Mi phones</p>
-                </div>
-                <a
-                  href="/api/download/apk"
-                  download="tripzoo.apk"
-                  className="bg-white hover:bg-blue-50 text-blue-900 px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm shrink-0"
-                >
-                  Download .APK ⬇️
-                </a>
+              <div className="text-xs text-slate-500 max-w-md">
+                Drivers can scan this code to immediately open Trip Zoo and tap <strong>&quot;Install App&quot;</strong> or <strong>&quot;Add to Home Screen&quot;</strong>.
               </div>
             </div>
           )}
@@ -171,7 +157,7 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
           {activeTab === 'whatsapp' && (
             <div className="space-y-4">
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 font-medium">
-                📲 Send this pre-formatted message directly to your Driver WhatsApp Group. It contains the web app link and direct APK download link!
+                📲 Send this pre-formatted message directly to your Driver WhatsApp Group. It contains the web app link with easy install steps!
               </div>
 
               <div className="bg-slate-900 text-emerald-400 p-4 rounded-2xl font-mono text-xs whitespace-pre-line leading-relaxed border border-slate-800 shadow-inner">
@@ -208,27 +194,14 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
                     <span>Android (Google Chrome)</span>
                   </div>
                   <ol className="text-xs text-slate-600 space-y-1.5 list-decimal pl-4">
-                    <li>Open <strong>{appUrl || 'Trip Zoo'}</strong> in Chrome.</li>
-                    <li>Tap <strong>&quot;Install App&quot;</strong> on the bottom banner.</li>
-                    <li>Or tap Chrome menu (<strong>⋮</strong> at top right) $\rightarrow$ select <strong>&quot;Add to Home screen&quot;</strong>.</li>
-                  </ol>
-                </div>
-
-                {/* Samsung / Vivo / Mi */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-slate-900 font-black text-sm">
-                    <span className="text-lg">📱</span>
-                    <span>Samsung / Vivo / Mi Browser</span>
-                  </div>
-                  <ol className="text-xs text-slate-600 space-y-1.5 list-decimal pl-4">
-                    <li>Tap browser Menu (<strong>☰</strong> or <strong>⋮</strong>).</li>
-                    <li>Select <strong>&quot;Add page to&quot;</strong> or <strong>&quot;Add to Desktop&quot;</strong>.</li>
-                    <li><strong>Best Alternative:</strong> Download and install the <strong>.APK</strong> file directly!</li>
+                    <li>Open <strong>{appUrl || 'https://tripzoo.vercel.app'}</strong> in Chrome.</li>
+                    <li>Tap <strong>&quot;Install App&quot;</strong> on the bottom popup.</li>
+                    <li>Or tap Chrome menu (<strong>⋮</strong> at top right) $\rightarrow$ select <strong>&quot;Install app&quot;</strong> or <strong>&quot;Add to Home screen&quot;</strong>.</li>
                   </ol>
                 </div>
 
                 {/* iPhone Safari */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 sm:col-span-2">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center gap-2 text-slate-900 font-black text-sm">
                     <span className="text-lg">🍏</span>
                     <span>iPhone (Apple Safari)</span>

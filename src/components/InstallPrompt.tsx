@@ -13,84 +13,100 @@ export default function InstallPrompt() {
   const { t } = useLanguage();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Check if already dismissed recently (expire after 7 days)
-    const dismissed = localStorage.getItem('tripcounter_install_dismissed');
-    if (dismissed && dismissed !== 'installed') {
-      const dismissedTime = parseInt(dismissed, 10);
-      if (!isNaN(dismissedTime) && Date.now() - dismissedTime < 7 * 24 * 60 * 60 * 1000) {
-        return;
-      }
-    } else if (dismissed === 'installed') {
-      return;
-    }
-
-    // Check if running in standalone mode (already installed)
-    const isStandalone =
+    // Check if running in standalone mode (already installed as PWA)
+    const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
 
-    if (isStandalone) return;
+    setIsStandalone(standalone);
+    if (standalone) return;
 
-    // Detect iOS Safari
+    // Detect iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const isAppleDevice = /iphone|ipad|ipod/.test(userAgent);
-    const isSafari = /safari/.test(userAgent) && !/chrome|crios|fxios/.test(userAgent);
+    const isApple = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(isApple);
 
-    if (isAppleDevice && isSafari) {
-      setIsIOS(true);
-      // Small delay for smooth appearance
-      const timer = setTimeout(() => setShowPrompt(true), 1200);
-      return () => clearTimeout(timer);
-    }
-
-    // Android / Desktop Chrome beforeinstallprompt event
+    // Capture Android / Chrome beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setTimeout(() => setShowPrompt(true), 1000);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // Listen for custom trigger from any page button (e.g. login page, settings)
+    const handleCustomTrigger = () => {
+      setShowPrompt(true);
+    };
+    window.addEventListener('open-install-prompt', handleCustomTrigger);
+
+    // Show prompt automatically after 800ms if not in standalone
+    const timer = setTimeout(() => {
+      const dismissed = sessionStorage.getItem('tripcounter_install_dismissed_session');
+      if (!dismissed) {
+        setShowPrompt(true);
+      }
+    }, 800);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('open-install-prompt', handleCustomTrigger);
+      clearTimeout(timer);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    setShowPrompt(false);
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      localStorage.setItem('tripcounter_install_dismissed', 'installed');
+    if (deferredPrompt) {
+      setShowPrompt(false);
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsStandalone(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // If native prompt is not available, show visual step-by-step installation guide
+      setShowGuide(true);
     }
-    setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Remember dismissal for 7 days
-    localStorage.setItem('tripcounter_install_dismissed', Date.now().toString());
+    setShowGuide(false);
+    // Dismiss only for current session so it doesn't annoy the user permanently
+    sessionStorage.setItem('tripcounter_install_dismissed_session', 'true');
   };
 
-  if (!showPrompt) return null;
+  if (isStandalone || !showPrompt) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 text-slate-800 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-300">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 text-slate-800 space-y-4 relative">
+        {/* Close Button */}
+        <button
+          onClick={handleDismiss}
+          className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 text-sm font-bold transition-all"
+        >
+          ✕
+        </button>
+
         {/* Header with App Logo */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 pr-6">
           <img
             src="/icons/icon-192x192.png"
             alt="Trip Zoo"
-            className="w-12 h-12 rounded-xl shadow-md border border-slate-100 object-cover"
+            className="w-13 h-13 rounded-2xl shadow-md border border-slate-100 object-cover shrink-0"
           />
           <div>
-            <h3 className="font-extrabold text-base text-slate-900 leading-tight">
+            <span className="inline-block bg-blue-100 text-blue-900 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mb-0.5">
+              Official App
+            </span>
+            <h3 className="font-black text-base text-slate-900 leading-tight">
               {t('pwa.installTitle')}
             </h3>
             <p className="text-xs text-slate-500 font-semibold">
@@ -99,31 +115,63 @@ export default function InstallPrompt() {
           </div>
         </div>
 
-        {/* Content based on Platform */}
-        {isIOS ? (
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700">
-            <p className="font-bold text-slate-800">
-              {t('pwa.iosInstructionsTitle')}
+        {/* Step-by-Step Guide or Summary */}
+        {showGuide || isIOS ? (
+          <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-3 text-xs text-slate-700">
+            <p className="font-extrabold text-blue-950 flex items-center gap-1.5">
+              <span>📲</span>
+              <span>{isIOS ? 'How to install on iPhone (Safari):' : 'How to install on Android (Chrome):'}</span>
             </p>
-            <div className="flex items-start space-x-2">
-              <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-900 rounded-full font-black text-[11px] shrink-0 mt-0.5">
-                1
-              </span>
-              <p>
-                {t('pwa.iosStep1')} <span className="text-base font-bold">⎋</span> / <span className="inline-block px-1 bg-slate-200 rounded">⎙</span>
-              </p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-900 rounded-full font-black text-[11px] shrink-0 mt-0.5">
-                2
-              </span>
-              <p>
-                {t('pwa.iosStep2')} <strong className="text-blue-900">➕</strong>
-              </p>
-            </div>
+            {isIOS ? (
+              <div className="space-y-2">
+                <div className="flex items-start space-x-2">
+                  <span className="flex items-center justify-center w-5 h-5 bg-blue-900 text-white rounded-full font-black text-[10px] shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <p>
+                    Tap the <strong>Share button</strong> at bottom of Safari <span className="font-bold text-blue-900">⎋</span>.
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <span className="flex items-center justify-center w-5 h-5 bg-blue-900 text-white rounded-full font-black text-[10px] shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <p>
+                    Scroll down and tap <strong>Add to Home Screen ➕</strong>.
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <span className="flex items-center justify-center w-5 h-5 bg-blue-900 text-white rounded-full font-black text-[10px] shrink-0 mt-0.5">
+                    3
+                  </span>
+                  <p>
+                    Tap <strong>Add</strong> in top-right. The app is installed!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-start space-x-2">
+                  <span className="flex items-center justify-center w-5 h-5 bg-blue-900 text-white rounded-full font-black text-[10px] shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <p>
+                    Tap the <strong>three dots menu (⋮)</strong> at top-right in Chrome.
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <span className="flex items-center justify-center w-5 h-5 bg-blue-900 text-white rounded-full font-black text-[10px] shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <p>
+                    Select <strong>Install app</strong> (or <strong>Add to Home screen</strong>).
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          <p className="text-xs text-slate-600 leading-relaxed">
+          <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
             {t('pwa.androidDescription')}
           </p>
         )}
@@ -131,34 +179,23 @@ export default function InstallPrompt() {
         {/* Share option */}
         <ShareButton variant="banner" />
 
-        {/* Actions */}
-        {!isIOS && (
-          <a
-            href="/api/download/apk"
-            download="tripzoo.apk"
-            className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 text-xs font-black shadow-xs transition-all text-center"
-          >
-            <span>🤖</span>
-            <span>{t('common.downloadApk')}</span>
-          </a>
-        )}
-
-        <div className="flex space-x-2 pt-1">
-          {deferredPrompt && !isIOS ? (
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2 pt-1">
+          {!showGuide && !isIOS ? (
             <button
               onClick={handleInstallClick}
-              className="flex-1 bg-blue-900 hover:bg-blue-800 text-white rounded-xl py-2.5 text-xs font-bold shadow-md hover:shadow-lg transition-all"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl py-3 text-sm font-black shadow-md hover:shadow-lg transition-all"
             >
-              {t('pwa.installAppBtn')}
+              <span>📲</span>
+              <span>{t('pwa.installAppBtn')}</span>
             </button>
           ) : null}
+
           <button
             onClick={handleDismiss}
-            className={`${
-              isIOS || !deferredPrompt ? 'w-full' : 'w-1/3'
-            } bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-xs font-bold transition-all`}
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-2.5 text-xs font-bold transition-all text-center"
           >
-            {isIOS ? t('pwa.gotItBtn') : t('pwa.maybeLaterBtn')}
+            {isIOS || showGuide ? t('pwa.gotItBtn') : t('pwa.maybeLaterBtn')}
           </button>
         </div>
       </div>

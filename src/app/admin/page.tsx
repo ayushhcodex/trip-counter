@@ -1078,14 +1078,6 @@ export default function AdminDashboard() {
             📱 {t('common.onboardDrivers')}
           </button>
           <span>•</span>
-          <a
-            href="/api/download/apk"
-            download="tripzoo.apk"
-            className="text-emerald-400 hover:text-emerald-300 font-bold"
-          >
-            ⬇️ {t('common.downloadApk')}
-          </a>
-          <span>•</span>
           <Link href="/privacy" className="hover:text-slate-200">
             {t('common.privacyPolicy')}
           </Link>

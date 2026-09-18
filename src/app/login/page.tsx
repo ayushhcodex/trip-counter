@@ -68,6 +68,12 @@ export default function LoginPage() {
     }
   };
 
+  const handleOpenPwaInstall = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-install-prompt'));
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 sm:p-6 space-y-6">
       <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-6 sm:p-8 border border-slate-200 space-y-6">
@@ -151,24 +157,24 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Driver Installation / APK Download Banner */}
+        {/* PWA Install & Driver Onboarding Section (No raw APK buttons) */}
         <div className="space-y-2 pt-1 border-t border-slate-100">
-          <a
-            href="/api/download/apk"
-            download="tripzoo.apk"
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 px-3 rounded-xl text-xs font-black shadow-xs transition-all text-center"
+          <button
+            onClick={handleOpenPwaInstall}
+            type="button"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 hover:from-blue-800 hover:to-indigo-800 text-white py-3 px-4 rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all text-center"
           >
-            <span>🤖</span>
-            <span>{t('common.downloadApk')}</span>
-          </a>
+            <span>📲</span>
+            <span>{t('pwa.installAppBtn')} / Add to Home Screen</span>
+          </button>
 
           <button
             onClick={() => setShowOnboarding(true)}
             type="button"
-            className="w-full flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 py-2 rounded-xl text-xs font-bold transition-all border border-slate-200"
+            className="w-full flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 py-2.5 rounded-xl text-xs font-bold transition-all border border-slate-200"
           >
-            <span>📱</span>
-            <span>Need help installing? / QR & Guide</span>
+            <span>📋</span>
+            <span>Driver QR & Setup Guide</span>
           </button>
         </div>
 
