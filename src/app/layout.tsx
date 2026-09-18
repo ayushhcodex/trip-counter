@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Trip Zoo",
-  description: "Trip Zoo",
+  description: "Trip Zoo - Fleet Trip Counter & Management",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192x192.png",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Trip Zoo",
   },
 };
@@ -48,6 +48,31 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="application-name" content="Trip Zoo" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.deferredInstallPrompt = null;
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.deferredInstallPrompt = e;
+                window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
+              });
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.error('[PWA SW]', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full bg-slate-50 text-slate-900 flex flex-col">
         <LanguageProvider>
           <PwaRegister />

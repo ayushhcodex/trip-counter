@@ -68,9 +68,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleOpenPwaInstall = () => {
+  const handleOpenPwaInstall = async () => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('open-install-prompt'));
+      const promptEvent = (window as any).deferredInstallPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        try {
+          const choice = await promptEvent.userChoice;
+          if (choice.outcome === 'accepted') {
+            (window as any).deferredInstallPrompt = null;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        window.dispatchEvent(new CustomEvent('open-install-prompt'));
+      }
     }
   };
 

@@ -21,7 +21,8 @@ export default function InstallPrompt() {
     // Check if running in standalone mode (already installed as PWA)
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://');
 
     setIsStandalone(standalone);
     if (standalone) return;
@@ -31,46 +32,73 @@ export default function InstallPrompt() {
     const isApple = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isApple);
 
-    // Capture Android / Chrome beforeinstallprompt event
+    // Sync from global early listener
+    if ((window as any).deferredInstallPrompt) {
+      setDeferredPrompt((window as any).deferredInstallPrompt);
+    }
+
+    const handlePromptReady = () => {
+      if ((window as any).deferredInstallPrompt) {
+        setDeferredPrompt((window as any).deferredInstallPrompt);
+      }
+    };
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      (window as any).deferredInstallPrompt = e;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
 
-    // Listen for custom trigger from any page button (e.g. login page, settings)
+    // Listen for custom trigger from any button on the page
     const handleCustomTrigger = () => {
-      setShowPrompt(true);
+      const promptEvent = (window as any).deferredInstallPrompt || deferredPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        promptEvent.userChoice.then((choice: { outcome: string }) => {
+          if (choice.outcome === 'accepted') {
+            (window as any).deferredInstallPrompt = null;
+            setDeferredPrompt(null);
+            setShowPrompt(false);
+          }
+        });
+      } else {
+        setShowPrompt(true);
+        setShowGuide(true);
+      }
     };
     window.addEventListener('open-install-prompt', handleCustomTrigger);
 
-    // Show prompt automatically after 800ms if not in standalone
+    // Auto-display modal popup after 1s if not installed and not dismissed in current session
     const timer = setTimeout(() => {
       const dismissed = sessionStorage.getItem('tripcounter_install_dismissed_session');
       if (!dismissed) {
         setShowPrompt(true);
       }
-    }, 800);
+    }, 1000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
       window.removeEventListener('open-install-prompt', handleCustomTrigger);
       clearTimeout(timer);
     };
-  }, []);
+  }, [deferredPrompt]);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    const promptEvent = (window as any).deferredInstallPrompt || deferredPrompt;
+    if (promptEvent) {
       setShowPrompt(false);
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice.outcome === 'accepted') {
+        (window as any).deferredInstallPrompt = null;
+        setDeferredPrompt(null);
         setIsStandalone(true);
       }
-      setDeferredPrompt(null);
     } else {
-      // If native prompt is not available, show visual step-by-step installation guide
       setShowGuide(true);
     }
   };
@@ -78,11 +106,12 @@ export default function InstallPrompt() {
   const handleDismiss = () => {
     setShowPrompt(false);
     setShowGuide(false);
-    // Dismiss only for current session so it doesn't annoy the user permanently
     sessionStorage.setItem('tripcounter_install_dismissed_session', 'true');
   };
 
   if (isStandalone || !showPrompt) return null;
+
+  const hasNativePrompt = Boolean((window as any).deferredInstallPrompt || deferredPrompt);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-300">
@@ -104,7 +133,7 @@ export default function InstallPrompt() {
           />
           <div>
             <span className="inline-block bg-blue-100 text-blue-900 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mb-0.5">
-              Official App
+              Install App
             </span>
             <h3 className="font-black text-base text-slate-900 leading-tight">
               {t('pwa.installTitle')}
@@ -115,8 +144,8 @@ export default function InstallPrompt() {
           </div>
         </div>
 
-        {/* Step-by-Step Guide or Summary */}
-        {showGuide || isIOS ? (
+        {/* Content / Guide */}
+        {showGuide && !hasNativePrompt ? (
           <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-3 text-xs text-slate-700">
             <p className="font-extrabold text-blue-950 flex items-center gap-1.5">
               <span>📲</span>
@@ -129,7 +158,7 @@ export default function InstallPrompt() {
                     1
                   </span>
                   <p>
-                    Tap the <strong>Share button</strong> at bottom of Safari <span className="font-bold text-blue-900">⎋</span>.
+                    Tap the <strong>Share button</strong> at the bottom of Safari <span className="font-bold text-blue-900">⎋</span>.
                   </p>
                 </div>
                 <div className="flex items-start space-x-2">
@@ -145,7 +174,7 @@ export default function InstallPrompt() {
                     3
                   </span>
                   <p>
-                    Tap <strong>Add</strong> in top-right. The app is installed!
+                    Tap <strong>Add</strong> in top right.
                   </p>
                 </div>
               </div>
@@ -156,7 +185,7 @@ export default function InstallPrompt() {
                     1
                   </span>
                   <p>
-                    Tap the <strong>three dots menu (⋮)</strong> at top-right in Chrome.
+                    Tap the <strong>three dots menu (⋮)</strong> at top right in Chrome.
                   </p>
                 </div>
                 <div className="flex items-start space-x-2">
@@ -181,15 +210,13 @@ export default function InstallPrompt() {
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-2 pt-1">
-          {!showGuide && !isIOS ? (
-            <button
-              onClick={handleInstallClick}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl py-3 text-sm font-black shadow-md hover:shadow-lg transition-all"
-            >
-              <span>📲</span>
-              <span>{t('pwa.installAppBtn')}</span>
-            </button>
-          ) : null}
+          <button
+            onClick={handleInstallClick}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl py-3.5 text-sm font-black shadow-md hover:shadow-lg transition-all"
+          >
+            <span>📲</span>
+            <span>{hasNativePrompt ? t('pwa.installAppBtn') : '1-Tap Install / Add to Home'}</span>
+          </button>
 
           <button
             onClick={handleDismiss}
