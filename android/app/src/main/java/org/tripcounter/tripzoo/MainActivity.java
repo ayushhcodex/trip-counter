@@ -19,8 +19,8 @@ public class MainActivity extends Activity {
     private WebView mWebView;
     private ProgressBar mProgressBar;
 
-    // Production URL fallback - automatically loads latest live features from server
-    private static final String APP_URL = "https://tripcounter.app";
+    // Production URL - loads live app directly from Vercel
+    private static final String APP_URL = "https://tripzoo.vercel.app";
 
     @Override
     @SuppressLint("SetJavaScriptEnabled")
@@ -36,8 +36,6 @@ public class MainActivity extends Activity {
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
-        webSettings.setDatabaseEnabled(true);
-        webSettings.setAppCacheEnabled(true);
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);

@@ -50,7 +50,7 @@ export default function PrivacyPolicyPage() {
                 <span>1. Overview & Purpose</span>
               </h2>
               <p>
-                <strong>Trip Zoo</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;the Platform&quot;) is a mobile-first fleet operations and trip verification management system. This Privacy Policy explains how we collect, use, process, and safeguard information when drivers, supervisors, and administrators use the Trip Zoo web application and mobile application.
+                <strong>Trip Zoo</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;the Platform&quot;), operated by <strong>Rentzoo Private Limited</strong>, is a mobile-first fleet operations and trip verification management system. This Privacy Policy explains how we collect, use, process, and safeguard information when drivers, supervisors, and administrators use the Trip Zoo web application and mobile application.
               </p>
             </section>
 
@@ -102,7 +102,7 @@ export default function PrivacyPolicyPage() {
                 <span>6. Contact & Support</span>
               </h2>
               <p>
-                If you have any questions regarding your account data or privacy practices, please contact your depot supervisor or fleet system administrator.
+                If you have any questions regarding your account data or privacy practices, please contact your depot supervisor or reach out to <strong>Rentzoo Private Limited</strong>.
               </p>
             </section>
           </div>
@@ -118,7 +118,7 @@ export default function PrivacyPolicyPage() {
           <span>•</span>
           <Link href="/legal" className="hover:text-slate-200">{t('common.legalNotice')}</Link>
         </div>
-        <p>© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+        <p>© {new Date().getFullYear()} Rentzoo Private Limited. {t('common.allRightsReserved')}</p>
       </footer>
     </div>
   );

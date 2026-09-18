@@ -507,7 +507,7 @@ export default function DriverDashboard() {
             {t('common.termsOfService')}
           </Link>
           <span>•</span>
-          <a href="/downloads/tripzoo.apk" download="tripzoo.apk" className="text-emerald-700 font-bold hover:underline">
+          <a href="/api/download/apk" download="tripzoo.apk" className="text-emerald-700 font-bold hover:underline">
             APK ⬇️
           </a>
         </div>

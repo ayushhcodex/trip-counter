@@ -50,7 +50,7 @@ export default function LegalNoticePage() {
                 <span>1. Legal Entity & Platform Ownership</span>
               </h2>
               <p>
-                The <strong>Trip Zoo</strong> software platform, including all related source code, progressive web application assets, Android application packages (.APK), databases, trademarks, and visual designs, is the proprietary property of Trip Zoo Fleet Operations.
+                The <strong>Trip Zoo</strong> software platform, including all related source code, progressive web application assets, Android application packages (.APK), databases, trademarks, and visual designs, is the proprietary property of <strong>Rentzoo Private Limited</strong>.
               </p>
             </section>
 
@@ -68,7 +68,7 @@ export default function LegalNoticePage() {
                 <span>3. Intellectual Property Rights</span>
               </h2>
               <p>
-                All brand logos, graphic marks, interface elements, and custom typography contained within Trip Zoo are protected by applicable copyright and intellectual property laws. Reproduction or distribution without prior written authorization is strictly prohibited.
+                All brand logos, graphic marks, interface elements, and custom typography contained within Trip Zoo are protected by applicable copyright and intellectual property laws of Rentzoo Private Limited. Reproduction or distribution without prior written authorization is strictly prohibited.
               </p>
             </section>
 
@@ -77,7 +77,7 @@ export default function LegalNoticePage() {
                 <span>4. Software Distribution & APK Packages</span>
               </h2>
               <p>
-                The Trip Zoo Android APK is provided as a direct enterprise Progressive Web wrapper. Users must only download official application packages directly from authorized depot channels or the official Trip Zoo domain.
+                The Trip Zoo Android APK is provided as a direct enterprise Progressive Web wrapper. Users must only download official application packages directly from authorized depot channels or the official Rentzoo Private Limited domain.
               </p>
             </section>
 
@@ -102,7 +102,7 @@ export default function LegalNoticePage() {
           <span>•</span>
           <Link href="/legal" className="text-blue-400 hover:underline">{t('common.legalNotice')}</Link>
         </div>
-        <p>© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+        <p>© {new Date().getFullYear()} Rentzoo Private Limited. {t('common.allRightsReserved')}</p>
       </footer>
     </div>
   );

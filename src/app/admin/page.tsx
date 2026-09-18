@@ -1079,7 +1079,7 @@ export default function AdminDashboard() {
           </button>
           <span>•</span>
           <a
-            href="/downloads/tripzoo.apk"
+            href="/api/download/apk"
             download="tripzoo.apk"
             className="text-emerald-400 hover:text-emerald-300 font-bold"
           >
@@ -1098,7 +1098,7 @@ export default function AdminDashboard() {
             {t('common.legalNotice')}
           </Link>
         </div>
-        <p className="text-[11px] text-slate-500">© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+        <p className="text-[11px] text-slate-500">© {new Date().getFullYear()} Rentzoo Private Limited. {t('common.allRightsReserved')}</p>
       </footer>
 
       {/* Driver Onboarding & QR Toolkit Modal */}

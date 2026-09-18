@@ -154,7 +154,7 @@ export default function LoginPage() {
         {/* Quick Driver Installation / APK Download Banner */}
         <div className="space-y-2 pt-1 border-t border-slate-100">
           <a
-            href="/downloads/tripzoo.apk"
+            href="/api/download/apk"
             download="tripzoo.apk"
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 px-3 rounded-xl text-xs font-black shadow-xs transition-all text-center"
           >
@@ -173,7 +173,6 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center text-[11px] text-slate-400 font-semibold space-y-1">
-          <p>{t('auth.driverIdHint')}</p>
           <p className="text-slate-500">{t('auth.rolesHint')}</p>
         </div>
       </div>
@@ -193,7 +192,7 @@ export default function LoginPage() {
             {t('common.legalNotice')}
           </Link>
         </div>
-        <p className="text-[11px] text-slate-400">© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+        <p className="text-[11px] text-slate-400">© {new Date().getFullYear()} Rentzoo Private Limited. {t('common.allRightsReserved')}</p>
       </footer>
 
       {/* Driver Onboarding / Install Modal */}

@@ -50,7 +50,7 @@ export default function TermsOfServicePage() {
                 <span>1. Acceptance of Terms</span>
               </h2>
               <p>
-                By accessing and using the <strong>Trip Zoo</strong> application (&quot;App&quot;), you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not use the App.
+                By accessing and using the <strong>Trip Zoo</strong> application (&quot;App&quot;), provided and operated by <strong>Rentzoo Private Limited</strong>, you agree to be bound by these Terms of Service. If you do not agree to these terms, you may not use the App.
               </p>
             </section>
 
@@ -59,7 +59,7 @@ export default function TermsOfServicePage() {
                 <span>2. Authorized Fleet Use Only</span>
               </h2>
               <p>
-                Trip Zoo is designed strictly for registered drivers, fleet supervisors, and fleet managers. Unauthorized access, account sharing, or falsification of vehicle trip and diesel records is strictly prohibited.
+                Trip Zoo is designed strictly for registered drivers, fleet supervisors, and fleet managers authorized by Rentzoo Private Limited. Unauthorized access, account sharing, or falsification of vehicle trip and diesel records is strictly prohibited.
               </p>
             </section>
 
@@ -97,7 +97,7 @@ export default function TermsOfServicePage() {
                 <span>6. Termination of Access</span>
               </h2>
               <p>
-                Fleet management reserves the right to deactivate or revoke account access for any driver or staff member found violating operational procedures or providing false trip verification data.
+                Rentzoo Private Limited reserves the right to deactivate or revoke account access for any driver or staff member found violating operational procedures or providing false trip verification data.
               </p>
             </section>
           </div>
@@ -113,7 +113,7 @@ export default function TermsOfServicePage() {
           <span>•</span>
           <Link href="/legal" className="hover:text-slate-200">{t('common.legalNotice')}</Link>
         </div>
-        <p>© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+        <p>© {new Date().getFullYear()} Rentzoo Private Limited. {t('common.allRightsReserved')}</p>
       </footer>
     </div>
   );

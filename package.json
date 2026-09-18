@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "build": "next build --webpack",
+    "build:apk": "bash scripts/build-apk.sh",
     "start": "next start",
     "lint": "eslint"
   },

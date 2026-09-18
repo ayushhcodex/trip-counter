@@ -21,9 +21,9 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
     }
   }, []);
 
-  if (!isOpen) return null;
+  const apkUrl = `${appUrl || 'https://tripzoo.vercel.app'}/api/download/apk`;
 
-  const apkUrl = `${appUrl}/downloads/tripzoo.apk`;
+  if (!isOpen) return null;
 
   const getWhatsappMessage = () => {
     if (language === 'hi') {
@@ -143,9 +143,9 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
               </div>
 
               <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 shadow-inner flex flex-col items-center">
-                <QrCode value={appUrl || 'https://tripcounter.app'} size={220} />
+                <QrCode value={appUrl || 'https://tripzoo.vercel.app'} size={220} />
                 <p className="text-xs font-mono font-bold text-slate-500 mt-2 truncate max-w-xs">
-                  {appUrl}
+                  {appUrl || 'https://tripzoo.vercel.app'}
                 </p>
               </div>
 
@@ -157,7 +157,7 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
                   <p className="text-[11px] text-blue-100">For Samsung / Vivo / Mi phones</p>
                 </div>
                 <a
-                  href="/downloads/tripzoo.apk"
+                  href="/api/download/apk"
                   download="tripzoo.apk"
                   className="bg-white hover:bg-blue-50 text-blue-900 px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm shrink-0"
                 >
@@ -265,7 +265,7 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
                 </div>
 
                 <div className="flex justify-center py-2">
-                  <QrCode value={appUrl || 'https://tripcounter.app'} size={180} />
+                  <QrCode value={appUrl || 'https://tripzoo.vercel.app'} size={180} />
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs text-slate-700 max-w-sm mx-auto space-y-1 text-left font-medium">
@@ -291,7 +291,7 @@ export default function DriverOnboardingModal({ isOpen, onClose }: DriverOnboard
 
         {/* Footer */}
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-xs">
-          <span className="text-slate-400 font-medium">Trip Zoo Fleet System</span>
+          <span className="text-slate-400 font-medium">Trip Zoo • Rentzoo Private Limited</span>
           <button
             onClick={onClose}
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-xl font-bold transition-all"

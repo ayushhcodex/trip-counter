@@ -134,7 +134,7 @@ export default function InstallPrompt() {
         {/* Actions */}
         {!isIOS && (
           <a
-            href="/downloads/tripzoo.apk"
+            href="/api/download/apk"
             download="tripzoo.apk"
             className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 text-xs font-black shadow-xs transition-all text-center"
           >
