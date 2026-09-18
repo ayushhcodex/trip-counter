@@ -1,7 +1,8 @@
 {
-  "name": "Tripzoo - Trip Counter",
-  "short_name": "Tripzoo",
-  "description": "Mobile-first PWA for vehicle trip logging and verified counting.",
+  "id": "/",
+  "name": "Trip Zoo",
+  "short_name": "Trip Zoo",
+  "description": "Trip Zoo",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -12,13 +13,25 @@
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

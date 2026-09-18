@@ -2,7 +2,7 @@ import { TranslationDictionary } from '../types';
 
 export const en: TranslationDictionary = {
   common: {
-    appName: 'Tripzoo',
+    appName: 'Trip Zoo',
     tagline: 'Trip Counter & Verification',
     loading: 'Loading...',
     error: 'Error',
@@ -41,9 +41,18 @@ export const en: TranslationDictionary = {
     date: 'Date',
     actions: 'Actions',
     manageVehicles: 'Manage Vehicles →',
+    shareApp: 'Share App',
+    linkCopied: 'App link copied to clipboard!',
+    downloadApk: 'Download Android App (APK)',
+    downloadApkSubtitle: 'Direct install for all Android phones',
+    onboardDrivers: 'Onboard Drivers & QR',
+    privacyPolicy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
+    legalNotice: 'Legal & Compliance',
+    allRightsReserved: 'All rights reserved.',
   },
   auth: {
-    title: 'Tripzoo',
+    title: 'Trip Zoo',
     subtitle: 'Sign in to access your dashboard',
     usernameLabel: 'Driver ID / Username / Email',
     usernamePlaceholder: 'e.g. drv0001 or superadmin@tripcounter.org',
@@ -132,7 +141,7 @@ export const en: TranslationDictionary = {
     byAdmin: 'By',
   },
   superadmin: {
-    consoleTitle: 'Tripzoo Console',
+    consoleTitle: 'Trip Zoo Console',
     consoleSubtitle: 'Super Admin Control Hub',
     allVehicles: 'All Vehicles',
     vehicleNumber: 'Vehicle Number',
@@ -177,7 +186,7 @@ export const en: TranslationDictionary = {
     notesLabel: 'Notes',
   },
   pwa: {
-    installTitle: 'Install Tripzoo',
+    installTitle: 'Install Trip Zoo',
     installSubtitle: 'Fast trip logging & offline access',
     iosInstructionsTitle: 'To install this app on your iPhone:',
     iosStep1: 'Tap the Share button at the bottom of Safari:',

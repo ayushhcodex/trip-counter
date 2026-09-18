@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import ShareButton from '@/components/ShareButton';
+import DriverOnboardingModal from '@/components/DriverOnboardingModal';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,8 +15,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
   const [showPassword, setShowPassword] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,14 +69,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 sm:p-6">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8 border border-slate-200 space-y-6">
+    <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 sm:p-6 space-y-6">
+      <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-6 sm:p-8 border border-slate-200 space-y-6">
         {/* Top Header & Language Picker */}
         <div className="flex flex-col items-center justify-center text-center space-y-3">
-          <div className="w-full flex justify-end">
+          <div className="w-full flex justify-between items-center gap-2">
+            <ShareButton variant="button" />
             <LanguageSelector variant="segmented" />
           </div>
-          <div>
+          <div className="flex flex-col items-center">
+            <img
+              src="/icons/icon-192x192.png"
+              alt="Trip Zoo"
+              className="w-20 h-20 rounded-2xl shadow-lg border border-slate-100 object-cover mb-2"
+            />
             <h1 className="text-3xl font-black text-blue-900 tracking-tight">
               {t('auth.title')}
             </h1>
@@ -84,7 +93,7 @@ export default function LoginPage() {
         </div>
 
         {errorMsg && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-xs font-semibold text-center">
+          <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2.5 rounded-xl text-xs font-semibold text-center">
             {errorMsg}
           </div>
         )}
@@ -102,7 +111,7 @@ export default function LoginPage() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
             />
           </div>
 
@@ -127,14 +136,14 @@ export default function LoginPage() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-600 focus:bg-white text-slate-800 transition-colors"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className={`w-full bg-blue-900 hover:bg-blue-800 text-white rounded-lg py-3.5 text-sm font-bold shadow-md hover:shadow-lg transition-all focus:outline-none ${
+            className={`w-full bg-blue-900 hover:bg-blue-800 text-white rounded-xl py-3.5 text-sm font-black shadow-md hover:shadow-lg transition-all focus:outline-none ${
               submitting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
@@ -142,11 +151,56 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="text-center text-[11px] text-slate-400 font-semibold border-t border-slate-100 pt-4 space-y-1">
+        {/* Quick Driver Installation / APK Download Banner */}
+        <div className="space-y-2 pt-1 border-t border-slate-100">
+          <a
+            href="/downloads/tripzoo.apk"
+            download="tripzoo.apk"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 px-3 rounded-xl text-xs font-black shadow-xs transition-all text-center"
+          >
+            <span>🤖</span>
+            <span>{t('common.downloadApk')}</span>
+          </a>
+
+          <button
+            onClick={() => setShowOnboarding(true)}
+            type="button"
+            className="w-full flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 py-2 rounded-xl text-xs font-bold transition-all border border-slate-200"
+          >
+            <span>📱</span>
+            <span>Need help installing? / QR & Guide</span>
+          </button>
+        </div>
+
+        <div className="text-center text-[11px] text-slate-400 font-semibold space-y-1">
           <p>{t('auth.driverIdHint')}</p>
           <p className="text-slate-500">{t('auth.rolesHint')}</p>
         </div>
       </div>
+
+      {/* Legal Footer */}
+      <footer className="text-center text-xs text-slate-500 space-y-1">
+        <div className="flex items-center justify-center space-x-3 font-semibold">
+          <Link href="/privacy" className="hover:text-blue-700 hover:underline">
+            {t('common.privacyPolicy')}
+          </Link>
+          <span>•</span>
+          <Link href="/terms" className="hover:text-blue-700 hover:underline">
+            {t('common.termsOfService')}
+          </Link>
+          <span>•</span>
+          <Link href="/legal" className="hover:text-blue-700 hover:underline">
+            {t('common.legalNotice')}
+          </Link>
+        </div>
+        <p className="text-[11px] text-slate-400">© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+      </footer>
+
+      {/* Driver Onboarding / Install Modal */}
+      <DriverOnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
     </div>
   );
 }

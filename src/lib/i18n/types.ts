@@ -53,6 +53,15 @@ export interface TranslationDictionary {
     date: string;
     actions: string;
     manageVehicles: string;
+    shareApp: string;
+    linkCopied: string;
+    downloadApk: string;
+    downloadApkSubtitle: string;
+    onboardDrivers: string;
+    privacyPolicy: string;
+    termsOfService: string;
+    legalNotice: string;
+    allRightsReserved: string;
   };
   auth: {
     title: string;

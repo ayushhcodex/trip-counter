@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import ShareButton from '@/components/ShareButton';
 import SiteLoader from '@/components/SiteLoader';
 
 interface User {
@@ -405,7 +406,11 @@ export default function SuperAdminDashboard() {
       {/* Super Admin Control Header */}
       <header className="bg-slate-900 text-white px-4 sm:px-6 py-4 flex items-center justify-between shadow-md sticky top-0 z-20">
         <div className="flex items-center space-x-3">
-          <div className="bg-blue-600 text-white p-2 rounded-xl text-xl">⚡</div>
+          <img
+            src="/icons/icon-192x192.png"
+            alt="Trip Zoo"
+            className="w-10 h-10 rounded-xl shadow-sm border border-slate-700 object-cover shrink-0"
+          />
           <div>
             <h1 className="font-black text-lg sm:text-xl tracking-tight text-blue-400">
               Super Admin Control
@@ -415,7 +420,8 @@ export default function SuperAdminDashboard() {
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <ShareButton variant="icon" />
           <LanguageSelector variant="header" />
           <button
             onClick={handleLogout}

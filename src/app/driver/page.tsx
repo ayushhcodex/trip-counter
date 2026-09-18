@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getQueuedTrips, saveQueuedTrip, removeQueuedTrips, OfflineTrip } from '@/lib/indexeddb';
 import { getShiftInfo } from '@/lib/shifts';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import ShareButton from '@/components/ShareButton';
 import SiteLoader from '@/components/SiteLoader';
 
 interface TripItem {
@@ -292,11 +294,19 @@ export default function DriverDashboard() {
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full bg-slate-50 shadow-md min-h-screen">
       {/* Header */}
       <header className="bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div>
-          <h1 className="font-black text-lg tracking-tight text-blue-400">{t('common.appName')}</h1>
-          <p className="text-[11px] text-slate-400 font-semibold">{t('driver.portalTitle')}</p>
+        <div className="flex items-center space-x-2.5">
+          <img
+            src="/icons/icon-192x192.png"
+            alt="Trip Zoo"
+            className="w-9 h-9 rounded-xl shadow-sm border border-slate-700 object-cover shrink-0"
+          />
+          <div>
+            <h1 className="font-black text-lg tracking-tight text-blue-400">{t('common.appName')}</h1>
+            <p className="text-[11px] text-slate-400 font-semibold">{t('driver.portalTitle')}</p>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
+          <ShareButton variant="icon" />
           <LanguageSelector variant="header" />
           <button
             onClick={handleLogout}
@@ -485,6 +495,21 @@ export default function DriverDashboard() {
                 })}
             </div>
           )}
+        </div>
+
+        {/* Legal & App Links for Driver */}
+        <div className="text-center text-[10px] text-slate-400 py-3 space-x-2">
+          <Link href="/privacy" className="hover:text-blue-800 underline">
+            {t('common.privacyPolicy')}
+          </Link>
+          <span>•</span>
+          <Link href="/terms" className="hover:text-blue-800 underline">
+            {t('common.termsOfService')}
+          </Link>
+          <span>•</span>
+          <a href="/downloads/tripzoo.apk" download="tripzoo.apk" className="text-emerald-700 font-bold hover:underline">
+            APK ⬇️
+          </a>
         </div>
       </main>
 

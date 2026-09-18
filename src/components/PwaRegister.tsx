@@ -5,21 +5,16 @@ import { useEffect } from 'react';
 export default function PwaRegister() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // Actively unregister all old/broken service workers
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister().catch(() => {});
-        }
-      }).catch(() => {});
-
-      // Clear any stale CacheStorage
-      if ('caches' in window) {
-        caches.keys().then((keys) => {
-          for (const key of keys) {
-            caches.delete(key).catch(() => {});
-          }
-        }).catch(() => {});
-      }
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('/sw.js')
+          .then((reg) => {
+            console.log('[PWA] Service Worker registered with scope:', reg.scope);
+          })
+          .catch((err) => {
+            console.error('[PWA] Service Worker registration failed:', err);
+          });
+      });
     }
   }, []);
 

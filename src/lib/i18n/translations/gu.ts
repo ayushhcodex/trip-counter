@@ -2,7 +2,7 @@ import { TranslationDictionary } from '../types';
 
 export const gu: TranslationDictionary = {
   common: {
-    appName: 'ટ્રિપઝૂ (Tripzoo)',
+    appName: 'ટ્રિપઝૂ (Trip Zoo)',
     tagline: 'ટ્રિપ કાઉન્ટર અને વેરિફિકેશન',
     loading: 'લોડ થઈ રહ્યું છે...',
     error: 'ભૂલ',
@@ -41,9 +41,18 @@ export const gu: TranslationDictionary = {
     date: 'તારીખ (Date)',
     actions: 'ક્રિયાઓ (Actions)',
     manageVehicles: 'વાહનોનું સંચાલન →',
+    shareApp: 'એપ શેર કરો (Share App)',
+    linkCopied: 'એપ લિંક કોપી થઈ ગઈ!',
+    downloadApk: 'એન્ડ્રોઇડ એપ ડાઉનલોડ કરો (.APK)',
+    downloadApkSubtitle: 'બધા એન્ડ્રોઇડ ફોન માટે ડાયરેક્ટ ઇન્સ્ટોલ',
+    onboardDrivers: 'ડ્રાઇવર ઓનબોર્ડિંગ અને ક્યુઆર કોડ',
+    privacyPolicy: 'ગોપનીયતા નીતિ (Privacy Policy)',
+    termsOfService: 'સેવાની શરતો (Terms of Service)',
+    legalNotice: 'કાનૂની અને અનુપાલન (Legal)',
+    allRightsReserved: 'સર્વાધિકાર સુરક્ષિત.',
   },
   auth: {
-    title: 'ટ્રિપઝૂ (Tripzoo)',
+    title: 'ટ્રિપઝૂ (Trip Zoo)',
     subtitle: 'ડેશબોર્ડ ખોલવા માટે સાઇન ઇન કરો',
     usernameLabel: 'ડ્રાઇવર આઈડી / યુઝરનેમ / ઇમેઇલ',
     usernamePlaceholder: 'દા.ત. drv0001 અથવા superadmin@tripcounter.org',
@@ -132,7 +141,7 @@ export const gu: TranslationDictionary = {
     byAdmin: 'દ્વારા (By)',
   },
   superadmin: {
-    consoleTitle: 'ટ્રિપઝૂ કન્સોલ (Tripzoo Console)',
+    consoleTitle: 'ટ્રિપઝૂ કન્સોલ (Trip Zoo Console)',
     consoleSubtitle: 'સુપર એડમિન કંટ્રોલ હબ',
     allVehicles: 'બધા વાહનો (All Vehicles)',
     vehicleNumber: 'વાહન નંબર',
@@ -177,7 +186,7 @@ export const gu: TranslationDictionary = {
     notesLabel: 'વિગત / નોંધ',
   },
   pwa: {
-    installTitle: 'ટ્રિપઝૂ એપ ઇન્સ્ટોલ કરો (Install Tripzoo)',
+    installTitle: 'ટ્રિપઝૂ એપ ઇન્સ્ટોલ કરો (Install Trip Zoo)',
     installSubtitle: 'ઝડપી ટ્રિપ લૉગિંગ અને ઑફલાઇન ઉપયોગ',
     iosInstructionsTitle: 'iPhone પર ઇન્સ્ટોલ કરવાની રીત:',
     iosStep1: 'Safari બ્રાઉઝરમાં નીચે શેર (Share) બટન દબાવો:',

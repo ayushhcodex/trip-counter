@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import ShareButton from '@/components/ShareButton';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -15,9 +16,16 @@ export default function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Check if already dismissed recently
+    // Check if already dismissed recently (expire after 7 days)
     const dismissed = localStorage.getItem('tripcounter_install_dismissed');
-    if (dismissed) return;
+    if (dismissed && dismissed !== 'installed') {
+      const dismissedTime = parseInt(dismissed, 10);
+      if (!isNaN(dismissedTime) && Date.now() - dismissedTime < 7 * 24 * 60 * 60 * 1000) {
+        return;
+      }
+    } else if (dismissed === 'installed') {
+      return;
+    }
 
     // Check if running in standalone mode (already installed)
     const isStandalone =
@@ -66,7 +74,7 @@ export default function InstallPrompt() {
   const handleDismiss = () => {
     setShowPrompt(false);
     // Remember dismissal for 7 days
-    localStorage.setItem('tripcounter_install_dismissed', 'true');
+    localStorage.setItem('tripcounter_install_dismissed', Date.now().toString());
   };
 
   if (!showPrompt) return null;
@@ -78,7 +86,7 @@ export default function InstallPrompt() {
         <div className="flex items-center space-x-3">
           <img
             src="/icons/icon-192x192.png"
-            alt="Tripzoo"
+            alt="Trip Zoo"
             className="w-12 h-12 rounded-xl shadow-md border border-slate-100 object-cover"
           />
           <div>
@@ -120,7 +128,21 @@ export default function InstallPrompt() {
           </p>
         )}
 
+        {/* Share option */}
+        <ShareButton variant="banner" />
+
         {/* Actions */}
+        {!isIOS && (
+          <a
+            href="/downloads/tripzoo.apk"
+            download="tripzoo.apk"
+            className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 text-xs font-black shadow-xs transition-all text-center"
+          >
+            <span>🤖</span>
+            <span>{t('common.downloadApk')}</span>
+          </a>
+        )}
+
         <div className="flex space-x-2 pt-1">
           {deferredPrompt && !isIOS ? (
             <button

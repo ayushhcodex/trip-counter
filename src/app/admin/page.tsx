@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useRef, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import ShareButton from '@/components/ShareButton';
 import SiteLoader from '@/components/SiteLoader';
+import DriverOnboardingModal from '@/components/DriverOnboardingModal';
 
 interface UserProfile {
   name: string;
@@ -556,6 +559,8 @@ export default function AdminDashboard() {
   const [isSubmittingAdj, setIsSubmittingAdj] = useState<boolean>(false);
   const [adjStatusMessage, setAdjStatusMessage] = useState<{ type: 'success' | 'error'; text: string; vehicleId: string } | null>(null);
 
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+
   // Quick Inline Diesel Log States
   const [activeDieselVehicleId, setActiveDieselVehicleId] = useState<string | null>(null);
   const [dieselDriverId, setDieselDriverId] = useState<string>('');
@@ -887,28 +892,44 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800">
       {/* Sticky Header */}
       <header className="sticky top-0 z-50 bg-slate-900 text-white border-b border-slate-800 shadow-sm px-4 py-3.5 flex items-center justify-between">
-        <div className="flex flex-col">
-          <h1 className="text-xl font-black text-blue-400 tracking-tight">{t('common.appName')}</h1>
-          {userProfile && (
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                userProfile.role === 'SUPERVISOR' || userProfile.role === 'ADMIN' ? 'bg-blue-800 text-blue-100' :
-                userProfile.role === 'SUPER_ADMIN' ? 'bg-purple-800 text-purple-100' :
-                'bg-blue-800 text-blue-100'
-              }`}>
-                {userProfile.role === 'SUPER_ADMIN' ? t('common.superAdminRole') : t('common.adminRole')}
-              </span>
-              <span className="text-xs text-slate-300 font-bold truncate max-w-[120px]">
-                {userProfile.name}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center space-x-3">
+          <img
+            src="/icons/icon-192x192.png"
+            alt="Trip Zoo"
+            className="w-10 h-10 rounded-xl shadow-sm border border-slate-700 object-cover shrink-0"
+          />
+          <div className="flex flex-col">
+            <h1 className="text-xl font-black text-blue-400 tracking-tight">{t('common.appName')}</h1>
+            {userProfile && (
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  userProfile.role === 'SUPERVISOR' || userProfile.role === 'ADMIN' ? 'bg-blue-800 text-blue-100' :
+                  userProfile.role === 'SUPER_ADMIN' ? 'bg-purple-800 text-purple-100' :
+                  'bg-blue-800 text-blue-100'
+                }`}>
+                  {userProfile.role === 'SUPER_ADMIN' ? t('common.superAdminRole') : t('common.adminRole')}
+                </span>
+                <span className="text-xs text-slate-300 font-bold truncate max-w-[120px]">
+                  {userProfile.name}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="flex items-center gap-1.5 text-xs font-black bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-xl transition-all shadow-xs"
+            title="Onboard Drivers (QR & APK)"
+          >
+            <span>📱</span>
+            <span className="hidden sm:inline">{t('common.onboardDrivers')}</span>
+          </button>
+          <ShareButton variant="icon" />
           <LanguageSelector variant="header" />
           <button 
             onClick={handleLogout}
-            className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-all"
+            className="text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-1.5 rounded-xl border border-slate-700 transition-all"
           >
             {t('common.logout')}
           </button>
@@ -1046,6 +1067,45 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Admin Legal & Support Footer */}
+      <footer className="bg-slate-900 text-slate-400 text-xs py-4 px-4 text-center border-t border-slate-800 space-y-2 mt-auto">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-semibold">
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="text-blue-400 hover:text-blue-300 font-bold"
+          >
+            📱 {t('common.onboardDrivers')}
+          </button>
+          <span>•</span>
+          <a
+            href="/downloads/tripzoo.apk"
+            download="tripzoo.apk"
+            className="text-emerald-400 hover:text-emerald-300 font-bold"
+          >
+            ⬇️ {t('common.downloadApk')}
+          </a>
+          <span>•</span>
+          <Link href="/privacy" className="hover:text-slate-200">
+            {t('common.privacyPolicy')}
+          </Link>
+          <span>•</span>
+          <Link href="/terms" className="hover:text-slate-200">
+            {t('common.termsOfService')}
+          </Link>
+          <span>•</span>
+          <Link href="/legal" className="hover:text-slate-200">
+            {t('common.legalNotice')}
+          </Link>
+        </div>
+        <p className="text-[11px] text-slate-500">© {new Date().getFullYear()} Trip Zoo. {t('common.allRightsReserved')}</p>
+      </footer>
+
+      {/* Driver Onboarding & QR Toolkit Modal */}
+      <DriverOnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
       
       {/* Global Styles for hide-scrollbar */}
       <style dangerouslySetInnerHTML={{__html: `
